@@ -123,7 +123,12 @@ def pySICE(sza,vza,saa,vaa,height,toa,ozon,water,voda,tozon,aot):
     # Correcting TOA reflectance for ozone and water scattering
     tvoda = np.exp(amf*voda*AKOWAT)
     toa = toa*tvoda*np.exp(amf*tozon*totadu/404.59)
+
+    #        toa[i_channel] = toa[i_channel]*np.exp(amf*tozon[i_channel]*totadu/404.59)
              
+    # bav 2019:
+    #   here was filtered dark ice pixels. Now this should be dealt with outside python upstream.
+    
     # transfer of OLCI relative azimuthal angle to the definition used in
     # radiative transfer code  
     raa=180.-(vaa-saa)                  
@@ -163,7 +168,12 @@ def pySICE(sza,vza,saa,vaa,height,toa,ozon,water,voda,tozon,aot):
     pa=(1-g*g)/(1.-2.*g*co+g*g)**1.5
     pr=0.75*(1.+co*co)
     p=(taumol*pr + tauaer*pa)/tau
+        
+    # STEP 1
+    # calculation of NDSI, NDBI and flags
+    # bav 2019:  Now done outside the python script
     
+    # STEP 2                         
     # retrieval of snow properties ( R_0, size of grains from OLCI channels 865[17] and 1020nm[21]
     # assumed not influenced by atmospheric scattering and absorption processes)                       
     
@@ -220,128 +230,128 @@ def pySICE(sza,vza,saa,vaa,height,toa,ozon,water,voda,tozon,aot):
         alb_sph[absor <=  1.e-6]=1.0
                                                   
     else:
-            # STEP 4b
-            # 2. polluted snow retrieval                      
-            # it is assumed that albedo is in the range 0.1-1.0
-            isnow=1           
-            x1=0.1
-            x2=1.2
-    
-            if (toa[20]<0.5):
-                # alex AUGUST 7, 2019
-                az=1.247
-                bz=1.186
-                cz=5.157
-                
-                am11=np.sqrt(1.-am1**2.)
-                am12=np.sqrt(1.-am2**2.)
-                
-                tz=np.arccos(-am1*am2+am11*am12*np.cos( raa*np.pi/180.))*180./np.pi
-                pz=11.1*np.exp(-0.087*tz)+1.1*np.exp(-0.014*tz)
-                rclean=az+bz*(am1+am2)+cz*am1*am2+pz
-                rclean=rclean/4./(am1+am2)
-                
-#                step=rclean/ak1/ak2
-                # END OF CHANGE: AUGUST 7, 2019
-                r0=rclean
-                isnow = 6
-            # could be parallelized
-            for i_channel in range(21):
-                # the solution of transcendent equation to find spherical albedo: alb_sph
-                # solving rtoa[i_channel] - alb2rtoa(aledo) = 0
-                def func_solv(albedo):
-                    return toa[i_channel] - alb2rtoa(albedo, tau[i_channel], 
-             g[i_channel], p[i_channel], amf, am1, am2, r0, ak1, ak2)
-                    
-                alb_sph[i_channel] = zbrent(func_solv,x1,x2,100,1.e-6)
-                if (alb_sph[i_channel]==1):
-                    isnow= 5
-                # alb_sph[i_channel]=(toa[i_channel] /r0)**(1./(ak1*ak2/r0))
-                # end loop channels
-                      
-            # INTERNal CHECK FOR CLEAN PIXELS
-            # if (alb_sph[0]>0.98): #go to 9393 = use clean pixel retrieval
-            # if (alb_sph[1]>0.98): #go to 9393 = use clean pixel retrieval
-            if (alb_sph[0]>0.98):
-                isnow= 7
-            
-            if (alb_sph[1]>0.98): 
-                isnow= 7
+        # STEP 4b
+        # 2. polluted snow retrieval                      
+        # it is assumed that albedo is in the range 0.1-1.0
+        isnow=1           
+        x1=0.1
+        x2=1.2
 
-            # unnecessary loop
-            #for i_channel in range(21):
-                
-            # analysis of snow impurities
-            # ( the concentrations below 0.0001 are not reliable )        
-            # bf    normalized absorption coefficient of pollutants ay 1000nm ( in inverse mm)
-            # bm    Angstroem absorption coefficient of pollutants ( around 1 - for soot, 3-7 for dust)
-            bm=0.0
-            bf=0.0
-                     
-            p1=np.log(alb_sph[0])*np.log(alb_sph[0])
-            p2=np.log(alb_sph[1])*np.log(alb_sph[1])
-            bm=np.log( p1/p2)/np.log(w[1]/w[0])
-            # type of pollutants
-            ntype=0
-            if (bm <= 1.2):   ntype=1   # soot
-            if (bm>1.2):     ntype=2    # dust
-    
-            if (bm>=0.1):
-                soda=(w[0])**bm
-                bf=soda*p1/bal
-                         
-            # normalized absorption coefficient of pollutants at the wavelength  1000nm
-            # alaska=w[0]
-            bff=p1/bal
-            # bal   -effective absorption length in microns
-           
-            BBBB=1.6        # enhancement factors for soot
-            FFFF= 0.9       # enhancement factors for ice grains
-            alfa=4.*np.pi*0.47/w[0]  # bulk soot absorption coefficient at 1000nm
-            DUST=0.01       # volumetric absorption coefficient of dust
-                           
-            if (ntype == 1): conc = BBBB*bff/FFFF/alfa
-            if (ntype == 2): conc = BBBB*bff/DUST
-            if (bm <= 0.5):    ntype=3 # type is other or mixture
-            if (bm >= 10.):    ntype=4 # type is other or mixture
-            # end of unnecessary loop
-    
-            # alex   09.06.2019
-            # reprocessing of albedo to remove gaseous absorption
-            # using linear polynomial approximation in the range 753-778nm
-            # Meaning:
-            # alb_sph[12],alb_sph[13] and alb_sph[14] are replaced by a linear 
-            # interpolation between alb_sph[11] and alb_sph[15]
-                 
-            x1=w[11]
-            x2=w[15]
-                 
-            y1=alb_sph[11]
-            y2=alb_sph[15]
-                  
-            afirn=(y2-y1)/(x2-x1)
-            bfirn=y2-afirn*x2
+        if (toa[20]<0.5):
+            # alex AUGUST 7, 2019
+            az=1.247
+            bz=1.186
+            cz=5.157
             
-            alb_sph[range(12,15)] = bfirn + afirn*w[range(12,15)]
-    
-            if (toa[20]>=0.5):
-                alb_sph[range(17,21)] = np.exp(-np.sqrt(4.*1000. \
-                        *al * np.pi * bai[range(17,21)] / w[range(17,21)] ))
-            else:
-                # ***********CORRECTION FOR VERSION 2.2*********************
-                # Alex, SEPTEMBER 26, 2019
-                # to avoid the influence of gaseous absorption (water vapor)
-                # we linearly interpolate in the range 885-1020nm
-                # for bare ice cases only (low toa[20])
-                # Meaning:
-                # alb_sph[18] and alb_sph[19] are replaced by a linear 
-                # interpolation between alb_sph[17] and alb_sph[20]
-                delx=w[20]-w[17]
-                bcoef=(alb_sph[20]-alb_sph[17])/delx
-                acoef=alb_sph[20]-bcoef*w[20]
+            am11=np.sqrt(1.-am1**2.)
+            am12=np.sqrt(1.-am2**2.)
+            
+            tz=np.arccos(-am1*am2+am11*am12*np.cos( raa*np.pi/180.))*180./np.pi
+            pz=11.1*np.exp(-0.087*tz)+1.1*np.exp(-0.014*tz)
+            rclean=az+bz*(am1+am2)+cz*am1*am2+pz
+            rclean=rclean/4./(am1+am2)
+            
+#                step=rclean/ak1/ak2
+            # END OF CHANGE: AUGUST 7, 2019
+            r0=rclean
+            isnow = 6
+        # could be parallelized
+        for i_channel in range(21):
+            # the solution of transcendent equation to find spherical albedo: alb_sph
+            # solving rtoa[i_channel] - alb2rtoa(aledo) = 0
+            def func_solv(albedo):
+                return toa[i_channel] - alb2rtoa(albedo, tau[i_channel], 
+         g[i_channel], p[i_channel], amf, am1, am2, r0, ak1, ak2)
                 
-                alb_sph[range(18,20)] = acoef+bcoef*w[range(18,20)]
-                # ***********************END of MODIFICATION**************                   
+            alb_sph[i_channel] = zbrent(func_solv,x1,x2,100,1.e-6)
+            if (alb_sph[i_channel]==1):
+                isnow= 5
+            # alb_sph[i_channel]=(toa[i_channel] /r0)**(1./(ak1*ak2/r0))
+            # end loop channels
+                  
+        # INTERNal CHECK FOR CLEAN PIXELS
+        # if (alb_sph[0]>0.98): #go to 9393 = use clean pixel retrieval
+        # if (alb_sph[1]>0.98): #go to 9393 = use clean pixel retrieval
+        if (alb_sph[0]>0.98):
+            isnow= 7
+        
+        if (alb_sph[1]>0.98): 
+            isnow= 7
+
+        # unnecessary loop
+        #for i_channel in range(21):
+            
+        # analysis of snow impurities
+        # ( the concentrations below 0.0001 are not reliable )        
+        # bf    normalized absorption coefficient of pollutants ay 1000nm ( in inverse mm)
+        # bm    Angstroem absorption coefficient of pollutants ( around 1 - for soot, 3-7 for dust)
+        bm=0.0
+        bf=0.0
+                 
+        p1=np.log(alb_sph[0])*np.log(alb_sph[0])
+        p2=np.log(alb_sph[1])*np.log(alb_sph[1])
+        bm=np.log( p1/p2)/np.log(w[1]/w[0])
+        # type of pollutants
+        ntype=0
+        if (bm <= 1.2):   ntype=1   # soot
+        if (bm>1.2):     ntype=2    # dust
+
+        if (bm>=0.1):
+            soda=(w[0])**bm
+            bf=soda*p1/bal
+                     
+        # normalized absorption coefficient of pollutants at the wavelength  1000nm
+        # alaska=w[0]
+        bff=p1/bal
+        # bal   -effective absorption length in microns
+       
+        BBBB=1.6        # enhancement factors for soot
+        FFFF= 0.9       # enhancement factors for ice grains
+        alfa=4.*np.pi*0.47/w[0]  # bulk soot absorption coefficient at 1000nm
+        DUST=0.01       # volumetric absorption coefficient of dust
+                       
+        if (ntype == 1): conc = BBBB*bff/FFFF/alfa
+        if (ntype == 2): conc = BBBB*bff/DUST
+        if (bm <= 0.5):    ntype=3 # type is other or mixture
+        if (bm >= 10.):    ntype=4 # type is other or mixture
+        # end of unnecessary loop
+
+        # alex   09.06.2019
+        # reprocessing of albedo to remove gaseous absorption
+        # using linear polynomial approximation in the range 753-778nm
+        # Meaning:
+        # alb_sph[12],alb_sph[13] and alb_sph[14] are replaced by a linear 
+        # interpolation between alb_sph[11] and alb_sph[15]
+             
+        x1=w[11]
+        x2=w[15]
+             
+        y1=alb_sph[11]
+        y2=alb_sph[15]
+              
+        afirn=(y2-y1)/(x2-x1)
+        bfirn=y2-afirn*x2
+        
+        alb_sph[range(12,15)] = bfirn + afirn*w[range(12,15)]
+
+        if (toa[20]>=0.5):
+            alb_sph[range(17,21)] = np.exp(-np.sqrt(4.*1000. \
+                    *al * np.pi * bai[range(17,21)] / w[range(17,21)] ))
+        else:
+            # ***********CORRECTION FOR VERSION 2.2*********************
+            # Alex, SEPTEMBER 26, 2019
+            # to avoid the influence of gaseous absorption (water vapor)
+            # we linearly interpolate in the range 885-1020nm
+            # for bare ice cases only (low toa[20])
+            # Meaning:
+            # alb_sph[18] and alb_sph[19] are replaced by a linear 
+            # interpolation between alb_sph[17] and alb_sph[20]
+            delx=w[20]-w[17]
+            bcoef=(alb_sph[20]-alb_sph[17])/delx
+            acoef=alb_sph[20]-bcoef*w[20]
+            
+            alb_sph[range(18,20)] = acoef+bcoef*w[range(18,20)]
+            # ***********************END of MODIFICATION**************                   
 
     # derivation of plane albedo                  
     rp=alb_sph**ak1
