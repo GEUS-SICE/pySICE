@@ -1,8 +1,8 @@
            program SICE
       
-c                      VERSION 3.0 or 2.0.1
+c                      VERSION 3.1 or 2.0.2
       
-c                   AUGUST 29, 2019
+c                   AUGUST 30, 2019
       
 c     This code retrieves snow/ice  albedo
 c               and related snow products
@@ -27,7 +27,9 @@ c***************************************************
 c     modification
 c     AUGUST 29 2019
 c               new code for BBA calculation> bare ice/dark ice      
-
+c     modification
+c     AUGUST 30 2019
+c               reading new input file: 2 new column added: total ozone, water vapour
 
       
 c                      Alexander  KOKHANOVSKY
@@ -39,7 +41,7 @@ c                    satellite and solar angles, lat, lon, height_of_ground_in_m
 c     output:    albedo, snow grain size, snow specific surface area,
 c                    concentration and type/properties  of pollutants in snow, etc.
       
-           real           answer(21),   tozon(21), 
+           real           answer(21),   tozon(21), voda(21),
      c                      w(21),            toa(21),
      c                      refl(21),rp(21),bai(21),xa(168),ya(168)
                integer ndate(6) 
@@ -118,7 +120,7 @@ c     c/v2_2_test/output/max_egp_olci.dat')
                      
 c     number of lines to read
                      
-                     open(1,file='olci_toa.dat')
+                     open(1,file='olci_toa_newformat.dat')
 
                      
 c     number of lines to read                    
@@ -146,9 +148,10 @@ c                  Alex 09.06.2019
 c     ozone vertical absorption thickness
                      
                      open(1975,file='tg_vod.dat')
-                     
-c     ozone concentration for a given place in kg/m/m                    
-                     open(1973,file='ozone.dat')
+                         open(1985,file='tg_water_vod.dat')
+c     ozone concentration for a given place in kg/m/m
+c               it is given now in the file olci_toa_newformat.dat                     
+c                     open(1973,file='ozone.dat')
                 
 c                retrieved ozone
                        open(1914,file='retrieved_O3.dat')
@@ -159,8 +162,8 @@ c                retrieved ozone
                      read(1975,*)
                      do 1976 np=1,21
                         read(1975,*)dlin,tozon(np)
-                       
- 1976            continue
+                        read(1985,*)dlin,voda(np)
+1976            continue
 
                      
 c     output
@@ -202,15 +205,23 @@ c!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                  do 87 J=1,nlines
 c                                           READING OLCI DATA:           
           read(1,*,end=87) ns,alat,alon,sza,vza,saa,vaa,height,
-     c                   (toa(iks),iks=1,21)
+     c                   (toa(iks),iks=1,21),OZON,WATER
 
              
-          read(1973,*) OZON
+       
           
-c          ecmwf ozone in DOBSON UNITS from OLCI file:          
-          totadu=46729.*ozon
+c     ecmwf ozone in DOBSON UNITS from OLCI file:
           
-          AKOEF=totadu/404.59
+     
+              totadu=46729.*ozon
+              AKOEF=totadu/404.59
+c                   kg/m**2. transfer to mol/cm**2         
+           roznov=2.99236e-22          
+          vap=water/roznov
+          
+      
+          
+          AKOWAT=vap/3.847e+22
           
 c!!!!Alex 28.06.2019         
      
@@ -231,8 +242,9 @@ c     AMF:  Alex
                  
                do 1941 nv=1,21
           
-                  
-             toa(nv)=toa(nv)*exp(amf*tozon(nv)*AKOEF)
+                  tvoda= exp(amf*voda(nv)*AKOWAT)
+                 
+             toa(nv)=toa(nv)*tvoda*exp(amf*tozon(nv)*AKOEF)
 
                   
 1941        continue
