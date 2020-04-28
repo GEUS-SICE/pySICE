@@ -43,7 +43,7 @@ structure:
 line number ( e.g.,time of measurements),latitude,longitude,solar zenith angle, viewing zenith angle,solar azimuthal angle,viewing azimuthal angle,height of underlying surface in m,
 21 OLCI TOA reflectances, ozone columne, water vapour column ( as provided in OLCI files - the same dimension)
 
-read(1,*) ns,alat,alon,sza,vza,saa,vaa,height,(toa(iks),iks=1,21),ozone,water
+                    read(1,*) ns,alat,alon,sza,vza,saa,vaa,height,(toa(iks),iks=1,21),ozone,water
                     
 
 2)
@@ -124,9 +124,7 @@ OUTPUT files:
 7              write(5570,333)ns,ndate(3),rp3,isnow
 8             write(55701,*)ns,ndate(3),icloud,iice
 
-  Retreived O3
-               write(1914,*) ns,alat,alon,BXXX,totadu,deltak,sza,vza,amf
-  
+   
  ---
 
 
@@ -165,15 +163,6 @@ otherwise: 0
 
 rp3,rp1,rp2-plane BBA, sequence: shortwave(0.3-2.4 micron), visible(0.3-0.7micron), near-infrared (0.7-2.4micron)
 rs3,rs1,rs2-spherical BBA( the same sequence as above)
-
-isnow = 0 clean snow
-isnow = 1 polluted snow
-isnow = 3 Grain diameter too small
-isnow = 4 Oa21 too dark (<0.1)
-isnow= 5 cannot solve zbrent
-isnow = 6 recalculation of r0 as rclean
-isnow = 7 spherical albedo of polluted snow high enough to use the clean snow retrieval
-
 
 
 
