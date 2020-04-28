@@ -1,13 +1,19 @@
-sice.f
+sice5.f
 
 
-Version 2.2
+Version 5.0
+April 1, 2020 -the analytical integration of BBA for teh clean snow has been performed
+the calculations of BBA_vis, BBA_nir have been removed
+
+
+the comments of BAPTISTE on xxx calculation have been taken into account
+
 26.09.2019 - the retrievals at water vapor channels are improved +refractive index is taken from a file
 A. KOKHANOVSKY
-30.08.2019- the case with small values of R(1020nm) (below 0.5) is added
+30.08.2019- the case with small values of R(1020nm) (below 0.4) is added
 
 ---------------------------
-The FORTRAN77 code sice.f is aimed at the determination of snow/ice properties using spaceborne observations.
+The FORTRAN77 code sice4.f is aimed at the determination of snow/ice properties using spaceborne observations.
 It has been prepared during the ESA SICE Project.
 
 In this version the ozone and water vapour  corection has been performed.
@@ -37,11 +43,11 @@ INPUT files:
 
 1)
 
-olci_TOA.dat
+olci_toa.dat
 
 structure:
 line number ( e.g.,time of measurements),latitude,longitude,solar zenith angle, viewing zenith angle,solar azimuthal angle,viewing azimuthal angle,height of underlying surface in m,
-21 OLCI TOA reflectances, ozone columne, water vapour column ( as provided in OLCI files - the same dimension)
+21 OLCI TOA reflectances, total ozone column, water vapour column ( as provided in OLCI files - the same dimension)
 
                     read(1,*) ns,alat,alon,sza,vza,saa,vaa,height,(toa(iks),iks=1,21),ozone,water
                     
@@ -85,12 +91,10 @@ Deafault: 0.1mm for ALDI
 If the respective values in the code are below these numbers the pixel is not processed
 (bare ice/opean water or clouds)
 
-7)retrieved_O3.dat
-This file contains retrieved total ozone from OLCI measurements in DU among other data:
-      write(1914,*) ns,alat,alon,BXXX,totadu,deltak,sza,vza,amf
-      pixel number, latitude,longitude,retrieved total ozone, ECMWF total ozone from OLCI files, relative difference,sza,vza,airmass factor
-      BXXX=999. means no retrieval / polluted snow
 
+7) gain.dat
+  if this file contains '1' in the first raw, then OLCI gains are applied to the retrievals
+  0-means no gains will be applied
 ------------------------------------------------------------------------------------------------
 ------------------------------------------------------------------------------------------------
 
@@ -103,7 +107,8 @@ OUTPUT files:
  6                open(557,file=   'bba.dat'                     )
  7                open(5570,file=   'bba_alex_reduced.dat')       
  8                open(55701,file=   'notsnow.dat')
- 
+ 9                 open(1914,file='retrieved_O3.dat')
+
                The file 'notsnow.dat' lists the lines which are not processed bacause they have clouds (first index=1) or bare ice (second index=1)
                The files *interm* give intermediate results needed only for the advanved users of the code. They do not provide essential output information.
 
@@ -119,11 +124,22 @@ OUTPUT files:
 5             write(1001,*) ns,ndate(3),alat,alon,D,area,al,r0,
       c       andsi,andbi,indexs,indexi,indexd,isnow
  
-6             write(557,33) ns,ndate(3),alat,alon,rp3,rp1,rp2,rs3,rs1,
-     c      rs2,isnow
+6             write(557,33) ns,ndate(3),alat,alon,rp3,rs3,
+     c      isnow
 7              write(5570,333)ns,ndate(3),rp3,isnow
 8             write(55701,*)ns,ndate(3),icloud,iice
+9            write(1914,*) ns,alat,alon,BXXX,totadu,deltak,sza,vza,amf
 
+The file retrieved_O3.dat
+contains retrieved total ozone from OLCI measurements in DU among other data:
+
+      ns,alat,alon,BXXX,totadu,deltak,sza,vza,amf:
+      
+      pixel number, latitude,longitude,retrieved total ozone,
+      ECMWF total ozone from OLCI files, relative difference,sza,vza,airmass factor
+
+
+      BXXX=999. means no retrieval / polluted snow
    
  ---
 
@@ -161,8 +177,8 @@ iice=1       for weakly reflecting ice ( no retrieval )
 otherwise: 0
 -------------------------------------------------
 
-rp3,rp1,rp2-plane BBA, sequence: shortwave(0.3-2.4 micron), visible(0.3-0.7micron), near-infrared (0.7-2.4micron)
-rs3,rs1,rs2-spherical BBA( the same sequence as above)
+rp3, plane BBA, shortwave(0.3-2.4 micron)
+rs3,spherical BBA, shortwave(0.3-2.4 micron)(see above)
 
 
 

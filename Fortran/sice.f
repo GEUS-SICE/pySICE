@@ -1,8 +1,44 @@
-           program SICE
+      program SICE
       
-c                      VERSION 3.1
+c      version 5.0
+c      LUT for clean snow BBA is introduces
+c      March 31, 2020
       
-c                   AUGUST 30, 2019
+c***********************************************      
+c     version 4.0
+c     March 10, 2020
+c     corrected for the comments of Baptiste
+c        see the string "BAPT"      
+c***********************************************      
+
+c      version 5.0
+c      LUT for clean snow BBA is introduces
+c      March 31, 2020
+      
+c________version 3.5  NOVEMBER 18, 2019
+c           Wiscombe equation for B      used      
+c     version 3.4
+c     NOVEMBER 8 2019
+c          correcting for ozone      
+c     including OLCI gains
+c                ALEX  08.11.2019
+c-----------------------------------------------------      
+c     VERSION 3.3
+c     NOVEMBER 7
+
+c         change of THV to 0.4
+c          correction - OCTOBER 28, 2019     
+c     SEPTEMBER 26, 2019
+      
+c*************************************************************************
+c     In this version the results for spectral albedo retrieval at 900 and 940nm
+c     (bands of water absorption) for low surface albedo cases
+c     are improved using linear interpolation in the range 885-1020nm
+
+C       In addition, refractive index of ice is used via Data INSIDE THE CODE.
+c*************************************************************************
+
+      
       
 c     This code retrieves snow/ice  albedo
 c               and related snow products
@@ -42,9 +78,11 @@ c     output:    albedo, snow grain size, snow specific surface area,
 c                    concentration and type/properties  of pollutants in snow, etc.
       
            real           answer(21),   tozon(21), voda(21),
-     c                      w(21),            toa(21),
-     c                      refl(21),rp(21),bai(21),xa(168),ya(168)
-               integer ndate(6) 
+     c                      w(21),            toa(21), golci(21),
+     c     refl(21),rp(21),bai(21),xa(168),ya(168)
+     
+           integer ndate(6)
+           
                 external fun,sobthv,psi,funp,funs
                 
                 common sza,vza,raa, g, wave,rtoa ,r0, height,aot
@@ -52,6 +90,361 @@ c                    concentration and type/properties  of pollutants in snow, e
                 common /quatro/x0,x1,x2,y0,y1,y2,ak1
                 
                 common /qua/ xa,ya,am1,AL,NSOLO
+c     OLCI gains
+                
+                data golci/.9798,.9718,.9747,.9781,.9827,.9892,.9922,
+     c               .9920,.9943,.9962,.996,1.003,1.,1.,1.,1.005,1.,
+     c             .996,1.,1.,0.914/
+
+
+
+
+                
+                
+c                 ICE REFRACTIVE INDEX
+
+       data xa /2.010E-001,
+     c2.019E-001,
+     c2.100E-001,
+     c2.500E-001,
+     c3.00E-001,
+     c3.500E-001,
+     c3.900E-001,
+     c4.000E-001,
+     c4.100E-001,
+     c4.200E-001,
+     c4.300E-001,
+     c4.400E-001,
+     c4.500E-001,
+     c4.600E-001,
+     c4.700E-001,
+     c4.800E-001,
+     c4.900E-001,
+     c5.000E-001,
+     c5.100E-001,
+     c5.200E-001,
+     c5.300E-001,
+     c5.400E-001,
+     c5.500E-001,
+     c5.600E-001,
+     c5.700E-001,
+     c5.800E-001,
+     c5.900E-001,
+     c6.000E-001,
+     c6.100E-001,
+     c6.200E-001,
+     c6.300E-001,
+     c6.400E-001,
+     c6.500E-001,
+     c6.600E-001,
+     c6.700E-001,
+     c6.800E-001,
+     c6.900E-001,
+     c7.000E-001,
+     c7.100E-001,
+     c7.200E-001,
+     c7.300E-001,
+     c7.400E-001,
+     c7.500E-001,
+     c7.600E-001,
+     c7.700E-001,
+     c7.800E-001,
+     c7.900E-001,
+     c8.000E-001,
+     c8.100E-001,
+     c8.200E-001,
+     c8.300E-001,
+     c8.400E-001,
+     c8.500E-001,
+     c8.600E-001,
+     c8.700E-001,
+     c8.800E-001,
+     c8.900E-001,
+     c9.000E-001,
+     c9.100E-001,
+     c9.200E-001,
+     c9.300E-001,
+     c9.400E-001,
+     c9.500E-001,
+     c9.600E-001,
+     c9.700E-001,
+     c9.800E-001,
+     c9.900E-001,
+     c1.000E+000,
+     c1.010E+000,
+     c1.020E+000,
+     c1.030E+000,
+     c1.040E+000,
+     c1.050E+000,
+     c1.060E+000,
+     c1.070E+000,
+     c1.080E+000,
+     c1.090E+000,
+     c1.100E+000,
+     c1.110E+000,
+     c1.120E+000,
+     c1.130E+000,
+     c1.140E+000,
+     c1.150E+000,
+     c1.160E+000,
+     c1.170E+000,
+     c1.180E+000,
+     c1.190E+000,
+     c1.200E+000,
+     c1.210E+000,
+     c1.220E+000,
+     c1.230E+000,
+     c1.240E+000,
+     c1.250E+000,
+     c1.260E+000,
+     c1.270E+000,
+     c1.280E+000,
+     c1.290E+000,
+     c1.300E+000,
+     c1.310E+000,
+     c1.320E+000,
+     c1.330E+000,
+     c1.340E+000,
+     c1.350E+000,
+     c1.360E+000,
+     c1.370E+000,
+     c1.380E+000,
+     c1.390E+000,
+     c1.400E+000,
+     c1.410E+000,
+     c1.420E+000,
+     c1.430E+000,
+     c1.440E+000,
+     c1.449E+000,
+     c1.460E+000,
+     c1.471E+000,
+     c1.481E+000,
+     c1.493E+000,
+     c1.504E+000,
+     c1.515E+000,
+     c1.527E+000,
+     c1.538E+000,
+     c1.563E+000,
+     c1.587E+000,
+     c1.613E+000,
+     c1.650E+000,
+     c1.680E+000,
+     c1.700E+000,
+     c1.730E+000,
+     c1.760E+000,
+     c1.800E+000,
+     c1.830E+000,
+     c1.840E+000,
+     c1.850E+000,
+     c1.855E+000,
+     c1.860E+000,
+     c1.870E+000,
+     c1.890E+000,
+     c1.905E+000,
+     c1.923E+000,
+     c1.942E+000,
+     c1.961E+000,
+     c1.980E+000,
+     c2.000E+000,
+     c2.020E+000,
+     c2.041E+000,
+     c2.062E+000,
+     c2.083E+000,
+     c2.105E+000,
+     c2.130E+000,
+     c2.150E+000,
+     c2.170E+000,
+     c2.190E+000,
+     c2.220E+000,
+     c2.240E+000,
+     c2.245E+000,
+     c2.250E+000,
+     c2.260E+000,
+     c2.270E+000,
+     c2.290E+000,
+     c2.310E+000,
+     c2.330E+000,
+     c2.350E+000,
+     c2.370E+000,
+     c2.390E+000,
+     c2.410E+000,
+     c2.430E+000,
+     c2.460E+000,
+     c2.500E+000/
+
+
+          data ya/
+     c         3.249E-011,
+     c                    2.0E-011,
+     c                     2.0E-011,
+     c                         2.0E-011,
+     c                              2.0E-011,
+     c                              2.0E-011,
+     c                                2.0E-011,
+     c                          2.365E-011,
+     c                             2.669E-011,
+     c                            3.135E-011,
+     c                                4.140E-011,
+     c                                 6.268E-011,
+     c                           9.239E-011,
+     c                                    1.325E-010,
+     c                                  1.956E-010,
+     c                            2.861E-010,
+     c                             4.172E-010,
+     c                               5.889E-010,
+     c                          8.036E-010,
+     c                            1.076E-009,
+     c                             1.409E-009,
+     c                         1.813E-009,
+     c                           2.289E-009,
+     c                       2.839E-009,
+     c                         3.461E-009,
+     c                           4.159E-009,
+     c                             4.930E-009,
+     c                          5.730E-009,
+     c                6.890E-009,
+     c                     8.580E-009,
+     c                      1.040E-008,
+     c                          1.220E-008,
+     c                        1.430E-008,
+     c                  1.660E-008,                              
+     c1.890E-008,
+     c2.090E-008,
+     c2.400E-008,
+     c2.900E-008,
+     c3.440E-008,
+     c4.030E-008,
+     c4.300E-008,
+     c4.920E-008,
+     c5.870E-008,
+     c7.080E-008,
+     c8.580E-008,
+     c1.020E-007,
+     c1.180E-007,
+     c1.340E-007,
+     c1.400E-007,
+     c1.430E-007,
+     c1.450E-007,
+     c1.510E-007,
+     c1.830E-007,
+     c2.150E-007,
+     c2.650E-007,
+     c3.350E-007,
+     c3.920E-007,
+     c4.200E-007,
+     c 4.440E-007,
+     c4.740E-007,
+     c5.110E-007,
+     c5.530E-007,
+     c6.020E-007,
+     c7.550E-007,
+     c9.260E-007,
+     c1.120E-006,
+     c1.330E-006,
+     c1.620E-006,
+     c2.000E-006,
+     c2.250E-006,
+     c2.330E-006,
+     c2.330E-006,
+     c2.170E-006,
+     c1.960E-006,
+     c1.810E-006,
+     c1.740E-006,
+     c1.730E-006,
+     c1.700E-006,
+     c1.760E-006,
+     c1.820E-006,
+     c2.040E-006,
+     c2.250E-006,
+     c2.290E-006,
+     c3.040E-006,
+     c3.840E-006,
+     c4.770E-006,
+     c5.760E-006,
+     c6.710E-006,
+     c8.660E-006,
+     c1.020E-005,
+     c1.130E-005,
+     c1.220E-005,
+     c1.290E-005,
+     c1.320E-005,
+     c1.350E-005,
+     c1.330E-005,
+     c1.320E-005,
+     c1.320E-005,
+     c1.310E-005,
+     c1.320E-005,
+     c1.320E-005,
+     c1.340E-005,
+     c1.390E-005,
+     c1.420E-005,
+     c1.480E-005,
+     c1.580E-005,
+     c1.740E-005,
+     c1.980E-005,
+     c3.442E-005,
+     c5.959E-005,
+     c1.028E-004,
+     c1.516E-004,
+     c2.030E-004,
+     c2.942E-004,
+     c3.987E-004,
+     c4.941E-004,
+     c5.532E-004,
+     c5.373E-004,
+     c5.143E-004,
+     c4.908E-004,
+     c4.594E-004,
+     c3.858E-004,
+     c3.105E-004,
+     c2.659E-004,
+     c2.361E-004,
+     c2.046E-004,
+     c1.875E-004,
+     c1.650E-004,
+     c1.522E-004,
+     c1.411E-004,
+     c1.302E-004,
+     c1.310E-004,
+     c1.339E-004,
+     c1.377E-004,
+     c1.432E-004,
+     c1.632E-004,
+     c2.566E-004,
+     c4.081E-004,
+     c7.060E-004,
+     c1.108E-003,
+     c1.442E-003,
+     c1.614E-003,
+     c1.640E-003,
+     c1.566E-003,
+     c1.458E-003,
+     c1.267E-003,
+     c1.023E-003,
+     c7.586E-004,
+     c5.255E-004,
+     c4.025E-004,
+     c3.235E-004,
+     c2.707E-004,
+     c2.228E-004,
+     c2.037E-004,
+     c2.026E-004,
+     c2.035E-004,
+     c2.078E-004,
+     c2.171E-004,
+     c2.538E-004,
+     c3.138E-004,
+     c3.858E-004,
+     c4.591E-004,
+     c5.187E-004,
+     c 5.605E-004,
+     c5.956E-004,
+     c6.259E-004,
+     c6.820E-004,
+     c7.530E-004/
+
+
+                
                 
 c             OLCI channels
                 
@@ -78,12 +471,12 @@ c             OLCI channels
      c                  0.1020E+01     /
 
 
-
+                        
          
 c     Imaginary part of ice refractive index at OLCI channels
          
                      DATA bai/         
-     c                  2.365E-11,      
+     c                  2.365E-11,     
      c                  2.7E-11,     
      c                  7.0E-11,      
      c                  4.17E-10,      
@@ -138,16 +531,16 @@ c      and for the TOA reflectance at 1020nm
                             open( 1984, file='limits.dat')
                             read(1984,*) ALR21,ALDI
                             
-c     imaginary part of ice refractive index
-                     open(5000,file='ice_index.dat')
-                     open(2099,file='interm.dat')
-                     open(1212, file='interm_alb.dat')
-                     
+c           OLCI gains
+
+c                            open( 1928,file='gain.dat')
+c                      read(1928,*) igain
+                            igain=0
 c***************************************************************************
 c                  Alex 09.06.2019
 c     ozone vertical absorption thickness
                      
-                     open(1975,file='tg_vod.dat')
+                     open(1975,file='tg_vod1.dat')
                          open(1985,file='tg_water_vod.dat')
 c     ozone concentration for a given place in kg/m/m
 c               it is given now in the file olci_toa_newformat.dat                     
@@ -158,8 +551,8 @@ c                retrieved ozone
 
 
                      
-                     read(1975,*)
-                     read(1975,*)
+                   
+                 
                      do 1976 np=1,21
                         read(1975,*)dlin,tozon(np)
                         read(1985,*)dlin,voda(np)
@@ -184,9 +577,11 @@ c                pre-assumed number: AOT-aerosol optical thickness  at 500nm
                  read(102,*) AOT
 
 c                reading ice refractive index
-                  do 8867 jg=1,168  
-             read(5000,*) xa(jg),an,ya(jg)
- 8867     continue
+c                 do 8867 jg=1,168
+c                    xa(jg)=wd1(jg)
+c                    ya(jg)=wd2(jg)
+c             read(5000,*) xa(jg),an,ya(jg)
+c 8867     continue
 
 
           icloud=0
@@ -206,10 +601,16 @@ c!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 c                                           READING OLCI DATA:           
           read(1,*,end=87) ns,alat,alon,sza,vza,saa,vaa,height,
      c                   (toa(iks),iks=1,21),OZON,WATER
-
-             
-       
           
+c                OLCI gains
+c            ALEX    08.11.2019
+          
+          if (igain.ne.1) go to 1193
+          
+            Do 1192 iks7=1,21
+                  toa(iks7)=toa(iks7)*golci(iks7)
+1192        continue
+ 1193       continue
 c     ecmwf ozone in DOBSON UNITS from OLCI file:
           
      
@@ -242,10 +643,12 @@ c     AMF:  Alex
                  
                do 1941 nv=1,21
           
-                  tvoda= exp(amf*voda(nv)*AKOWAT)
-                 
-             toa(nv)=toa(nv)*tvoda*exp(amf*tozon(nv)*AKOEF)
-
+c                 tvoda= exp(amf*voda(nv)*AKOWAT)
+                  tvoda=1.
+                  anew=exp(amf*tozon(nv)*AKOEF)
+                  astra=toa(nv)
+             toa(nv)=toa(nv)*anew
+c          write(*,*) nv,w(nv),toa(nv),astra,anew,tozon(nv),akoef,totadu
                   
 1941        continue
          
@@ -340,7 +743,7 @@ c                    thv=0.0
                     THV=SOBTHV(AOT)
                  
                            isnow=1
-                        write(2099,*) ndate(3),toa(1),thv
+c                        write(2099,*) ndate(3),toa(1),thv
                        if ( toa(1).lt.THV) go to 1961
 c**********************************************************
  9393                       continue
@@ -391,7 +794,7 @@ c                       2. polluted snow retrieval
 c                       it is assumed that albedo is in the range 0.1-1.0           
                     
                        x1=0.1
-                       x2=1.2
+                       x2=1.0
                        
 c                     convergence parameter for albedo search:           
                        tol=1.e-6
@@ -420,14 +823,42 @@ c     Alex AUGUST 7, 2019
                        rclean=rclean/4./(am1+am2)
                        step=rclean/ak1/ak2
 
-                       if ( toa(21).lt.0.5) r0=rclean
-c               END OF CHANGE: AUGUST 7, 2019
-c************************************************************************                       
-                       answer(isk)=zbrent(fun,x1,x2,tol)
-                 
+                       if ( toa(21).lt.0.4) r0=rclean
+c                     END OF CHANGE: AUGUST 7, 2019
 
+
+
+                       
+c***********************************************************************                       
+c     BAPT
+                        if ( toa(21).lt.0.4) xxx=ak1*ak2/r0
+c                      change : March 10, 2020                       
+c************************************************************************
+
+
+
+
+
+
+
+
+                        
+                           answer(isk)=0.5
+                       if (isk.eq.20) go to 8998
+                       if(isk.eq.19) go to 8998
+                       
+                 
+                       answer(isk)=zbrent(fun,x1,x2,tol)
+c                       steps=r0/ak1/ak2
+c                       otwet=(toa(isk)/r0)**steps
+
+c                       plat1=answer(isk)**ak1
+c                       plat2=otwet**ak1
+c                       write(*,*) isk, wave,plat1,plat2
                   
-                    
+ 8998                  continue
+c                       write(*,*) x1,x2,tol,answer(isk),isk
+                      
 c                       answer(isk)=(rtoa/r0)**(1./xxx)
 c!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
  577                continue
@@ -524,22 +955,25 @@ c      comment:       in the range >865nm the physical interpolation is used
                answer(15)=bfirn+afirn*0.767
 
                
-c                 first channels:              
+c     first channels:
+               
                  do 1989 m=1,17
                  
                        rp(m)=answer(m)**ak1
                        refl(m)=r0*answer(m)**xxx
                        
- 1989               continue
+ 1989         continue
 
-                    
-                if (toa(21).lt.0.5) go to 19644
+c     correction : NOVEMBER 7 2019
+            
+                if (toa(21).lt.0.35) go to 19644
                     
 c:          remaining channels                    
                      do 1890 m=18,21                                
                         answer(m)=exp(-sqrt(4.*1000.*AL*pi*bai(m)/w(m)))
 c     derivation of plane albedo                  
-                       rp(m)=answer(m)**ak1
+                        rp(m)=answer(m)**ak1
+                    
 c     derivation of snow reflectance function                      
                        refl(m)=r0*answer(m)**xxx
  1890               continue
@@ -547,9 +981,30 @@ c     derivation of snow reflectance function
 
 
                     
-19644           continue
-                 do 1891 m=18,21                                
+19644               continue
+                    
+c     ***********CORRECTION FOR VERSION 2.2*********************
+                    
+c                              ALEX
+c                    SEPTEMBER 26, 2019
+c     to avoid the influence of gaseous absorption (water vapor)
+c     we lienarly interpolate in the range 885-1020nm
+c        for bare ice cases only(low albedo)
                   
+                        
+                        delx=w(21)-w(18)
+                        bcoef=(answer(21)-answer(18))/delx
+                        acoef=answer(21)-bcoef*w(21)
+
+                        answer(19)=acoef+bcoef*w(19)
+                        answer(20)=acoef+bcoef*w(20)
+c************************END of MODIFICATION**************                        
+                   do 1891 m=18,21                                
+c                              ALEX
+c                    SEPTEMBER 26, 2019
+c     to avoid the influence of gaseous absorption (water vapor)
+c      we interpolate in the range 865-1020nm
+                    
 c     derivation of plane albedo                  
                        rp(m)=answer(m)**ak1
 c     derivation of snow reflectance function                      
@@ -568,7 +1023,7 @@ c***************************************************
              write(1001,*) ns,ndate(3),alat,alon,D,area,al,r0,
      c       andsi,andbi,indexs,indexi,indexd,isnow
 c***************************************************             
-
+c         write(*,*) ns,ndate(3),alat,alon,(rp(i),i=1,21),isnow
 
 
 
@@ -603,34 +1058,71 @@ c     solar flux calculation
                 sol3= sol1  +  sol2
                 
                 if (isnow.eq.1) go to 1924
+
+c**********************************************************************
                 
-c                clean snow
+c     analytical equations for clean snow BBA
+c     Alex
+c                      April 1, 2020                
+c     clean snow
+                diam=D*1000.
+        
+               
                 
 c     plane albedo
                 NSOLO=0
-                    call qsimp(funp,wave1,wave2,p1)
-                    rp1=p1/sol1
+c                    call qsimp(funp,wave1,wave2,p1)
+c                    rp1=p1/sol1
                    
-                    call qsimp(funp,wave2,wave3,p2)
-                    rp2=p2/sol2
-                    rp3=(p1+p2)/sol3
+c                    call qsimp(funp,wave2,wave3,p2)
+c                    rp2=p2/sol2
+c                    rp3=(p1+p2)/sol3
                     
+                    anka= 0.7389  -0.1783*am1     +0.0484*am1**2.
+                    banka=0.0853  +0.0414*am1     -0.0127*am1**2.
+                    canka=0.1384  +0.0762*am1     -0.0268*am1**2.
+                    diam1=187.89  -69.2636*am1     +40.4821*am1**2.
+                    diam2=2687.25 -405.09*am1   +94.5*am1**2.
+                    
+             rp3=anka+banka*exp(-diam/diam1)+canka*exp(-diam/diam2)
+     
+             
 c     spherical albedo
-                    NSOLO=1
-                    call qsimp(funp,wave1,wave2,s1)
-                    rs1=s1/sol1
-                    call qsimp(funp,wave2,wave3,s2)
-                    rs2=s2/sol2
-                    rs3=(s1+s2)/sol3
+            NSOLO=1
+       
+c                    call qsimp(funp,wave1,wave2,s1)
+c                    rs1=s1/sol1
+c                    call qsimp(funp,wave2,wave3,s2)
+c                    rs2=s2/sol2
+c                    s3k=s1+s2
+c                    rs3=(s1+s2)/sol3
+
+                 
+               
+                    anka= 0.6420
+                    banka=0.1044
+                    canka=0.1773
+                    diam1=158.62
+                    diam2=2448.18
+                 
                     
-                    go to 1945
+             rs3=anka+banka*exp(-diam/diam1)+canka*exp(-diam/diam2)
+                    
+           
+c**********************************************************************
+                    
+             go to 1945
+             
  1924           continue
 
                 
 c     polluted snow
                 
 
-c              NEW CODE FOR BBA OF BARE ICE
+c     NEW CODE FOR BBA OF BARE ICE
+                
+c     correction 28.10.2019
+                
 c     ALEX 29.08.2019
 
 c     this code calculates bba analytically
@@ -669,12 +1161,41 @@ c      r7=0.4472
 c    1020
 c      r8=0.2561
 c-------------------------
-      r2=toa(1)
-      r3=toa(6)
-      r5=toa(11)
-      r6=toa(12)
-      r7=toa(17)
-      r8=toa(21)
+      
+c          Alex - correction      25.10.2019
+c      r2=toa(1)
+c      r3=toa(6)
+c      r5=toa(11)
+c      r6=toa(12)
+c      r7=toa(17)
+c     r8=toa(21)
+
+      
+      do 892 jdom=1,2
+         
+         if (jdom.eq.2) go to 893
+         
+c          plane albedo calculation jdom=1         
+      r2=rp(1)
+      r3=rp(6)
+      r5=rp(11)
+      
+      r6=rp(12)
+      r7=rp(17)
+      r8=rp(21)
+      
+        go to 8949
+ 893    continue
+c          spherical albedo calculation jdom=2        
+      r2=answer(1)
+      r3=answer(6)
+      r5=answer(11)
+      
+      r6=answer(12)
+      r7=answer(17)
+      r8=answer(21)
+      
+8949    continue
 c      ------------------------------
 c     QUADRATIC POLYNOMIAL for the range 709-865nm
 
@@ -684,7 +1205,8 @@ c     QUADRATIC POLYNOMIAL for the range 709-865nm
       x2=alam7
       y0=r5
       y1=r6
-      y3=r7
+c     alex  25.10.2019
+      y2=r7
                           d1=(x0-x1)*(x0-x2)
                           d2=(x1-x0)*(x1-x2)
                           d3=(x2-x0)*(x2-x1)
@@ -703,7 +1225,8 @@ c     QUADRATIC POLYNOMIAL for the range 400-709nm
       x2=alam5
       y0=r2
       y1=r3
-      y3=r5
+c  Alex 25.10.2019      
+      y2=r5
                           d1=(x0-x1)*(x0-x2)
                           d2=(x1-x0)*(x1-x2)
                           d3=(x2-x0)*(x2-x1)
@@ -903,20 +1426,23 @@ c                     write(*,*) aj1,caj2,caj3,ajto
                      
 c                    write(*,*) bbat, bbavis, bbanir
                      
-                     rp3=bbat
-                     rp1=bbavis
-                     rp2=bbanir
+                     if (jdom.eq.1)rp3=bbat
+                     if (jdom.eq.1)rp1=bbavis
+                     if (jdom.eq.1) rp2=bbanir
+         
+                     if (jdom.eq.2)rs3=bbat
+                     if (jdom.eq.2)rs1=bbavis
+                     if (jdom.eq.2)rs2=bbanir
 
-
-
+ 892                 CONTINUE
                 
 c     end of modification  AUGUST 29, 2019
                      
 
                     
 1945       CONTINUE
-           write(557,33) ns,ndate(3),alat,alon,rp3,rp1,rp2,rs3,rs1,
-     c      rs2,isnow
+           write(557,33) ns,ndate(3),alat,alon,rp3,rs3,
+     c      isnow
            write(5570,333)ns,ndate(3),rp3,isnow
            
            go to 87
@@ -928,7 +1454,7 @@ c     end of modification  AUGUST 29, 2019
            icloud=0
            
  87     continue
- 33     format(i15,i19,3x,8f10.4,i4)
+ 33     format(i15,i19,3x,4f10.4,i4)
  333    format(i15,i19,2x,f10.4,i4)
         stop
         end
@@ -1009,10 +1535,25 @@ c                                  SOBOLEV
                
                R=RSS+RMS
                
-               t1=exp(-(1.-g)*tau/am1/2.)
-               t2=exp(-(1.-g)*tau/am2/2.)
+c              t1=exp(-(1.-g)*tau/am1/2.)
+c              t2=exp(-(1.-g)*tau/am2/2.)
 
-
+      
+         wa1=1.10363
+         wa2=-6.70122
+         
+         wx0=2.19777
+         wdx=0.51656
+         
+         bex=exp   (  (g-wx0)/wdx )
+         sssss=  (wa1-wa2)/(1.+bex)+wa2
+         
+       
+        
+         
+                 
+               t1=exp(-(1.-g)*tau/am1/2./sssss)
+               t2=exp(-(1.-g)*tau/am2/2./sssss)
 
 
             
@@ -1128,9 +1669,30 @@ c                                  SOBOLEV
                RMS=1.-b1*b2/OSKAR+(3.*(1.+g)*am1*am2-2.*(am1+am2))*ASTRA
                
                R=RSS+RMS
+c                    correction alex          NOVEMBER 18, 2019     
+c               t1=exp(-(1.-g)*tau/am1/2.)
+c     t2=exp(-(1.-g)*tau/am2/2.)
+
+             
+       
+         
+         wa1=1.10363
+         wa2=-6.70122
+         
+         wx0=2.19777
+         wdx=0.51656
+         
+         bex=exp   (  (g-wx0)/wdx )
+         sssss=  (wa1-wa2)/(1.+bex)+wa2
+         
+       
+        
+         
+                 
+               t1=exp(-(1.-g)*tau/am1/2./sssss)
+               t2=exp(-(1.-g)*tau/am2/2./sssss)
+c                   END OF CORRECTION
                
-               t1=exp(-(1.-g)*tau/am1/2.)
-               t2=exp(-(1.-g)*tau/am2/2.)
                ratm=salbed(tau)
 
 
@@ -1350,62 +1912,7 @@ c!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
       
 
-c                       integration routine
 
-             SUBROUTINE qsimp(func,a,b,s)
-              INTEGER JMAX
-               REAL a,b,func,s,EPS
-                 EXTERNAL func
-                    PARAMETER (EPS=1.e-3, JMAX=20)
-
-                       INTEGER j
-                       REAL os,ost,st
-               
-                        ost=-1.e30
-                        os= -1.e30
-      
-                       do 11 j=1,JMAX
-          
-                            call trapzd(func,a,b,st,j)
-                                s=(4.*st-ost)/3.
-       
-                                  if (j.gt.5) then
-          if (abs(s-os).lt.EPS*abs(os).or.(s.eq.0..and.os.eq.0.)) return
-          endif
-          os=s
-          ost=st
-11        continue
-          
-          END
-      
-      
-c     integration routine
-      
-                      SUBROUTINE trapzd(func,a,b,s,n)
-                       INTEGER n
-                          REAL a,b,s,func
-                          EXTERNAL func
-                            INTEGER it,j
-                            REAL del,sum,tnm,x
-                 
-                                if (n.eq.1) then
-                            s=0.5*(b-a)*(func(a)+func(b))
-       
-                          else
-                          it=2**(n-2)
-                         tnm=it
-                          del=(b-a)/tnm
-                          x=a+0.5*del
-                              sum=0.
-                       do 11 j=1,it
-                        sum=sum+func(x)
-                       x=x+del
-11                         continue
-                              s=0.5*(s+(b-a)*sum/tnm)
-        
-                     endif
-
-                     END
 
 
       
