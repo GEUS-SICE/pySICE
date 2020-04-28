@@ -1,6 +1,8 @@
            program SICE
       
-c                   VERSION 1.4
+c                      VERSION 3.0 or 2.0.1
+      
+c                   AUGUST 29, 2019
       
 c     This code retrieves snow/ice  albedo
 c               and related snow products
@@ -19,9 +21,12 @@ c     1rst version:        21.05.2019
 c     correction: Alex: 09.06.2019
 c     correction: Alex: 14.06.2019
 c     modification: Alex: 28.06.2019 - ozone retrieval is performed
+c     modification: Alex: 07.08.2019-if OLCI reflectance at channel 21 is below 0.5, then the clean snow reflectance is not retrieved but assumed.
 c***************************************************
 
-
+c     modification
+c     AUGUST 29 2019
+c               new code for BBA calculation> bare ice/dark ice      
 
 
       
@@ -386,12 +391,35 @@ c                     convergence parameter for albedo search:
                        rtoa=toa(isk)
 c!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 c                                          NB                       
-c     the solution of transcendent equation to find spherical albedo: answer                   
-                       answer(isk)=zbrent(fun,x1,x2,tol)
+c     the solution of transcendent equation to find spherical albedo: answer
+
                        
+c************************************************************************                       
+c     Alex AUGUST 7, 2019
+                       az=1.247
+                       bz=1.186
+                       cz=5.157
+                       am11=sqrt(1.-am1**2.)
+                       am12=sqrt(1.-am2**2.)
+                       tz=acos(-am1*am2+am11*am12*cos(raa*3.14159/180.))
+                       tz=tz*180./acos(-1.)
+                       pz=11.1*exp(-0.087*tz)+1.1*exp(-0.014*tz)
+                       rclean=az+bz*(am1+am2)+cz*am1*am2+pz
+                       rclean=rclean/4./(am1+am2)
+                       step=rclean/ak1/ak2
+
+                       if ( toa(21).lt.0.5) r0=rclean
+c               END OF CHANGE: AUGUST 7, 2019
+c************************************************************************                       
+                       answer(isk)=zbrent(fun,x1,x2,tol)
+                 
+
+                  
+                    
 c                       answer(isk)=(rtoa/r0)**(1./xxx)
 c!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
  577                continue
+                  
 c*****************************************************
 c                    write(1212,1213)  (answer(ik),ik=1,21),
 c     c                   (toa(ik),ik=1,21),rtoa,r0,al,d,xxx
@@ -486,19 +514,14 @@ c      comment:       in the range >865nm the physical interpolation is used
                
 c                 first channels:              
                  do 1989 m=1,17
-c                        x=w(m)
-c                       B0= (x-x1) * ( x-x2) /   (x0-x1) / ( x0-x2)          
-c                       B1= (x-x0) * ( x-x2) /   (x1-x0) / ( x1-x2)     
-c                       B2= (x-x0) * ( x-x1) /   (x2-x0) / ( x2-x1)
-c                       answer(m)=y0*B0+y1*B1+y2*B2
-                       
-c     derivation of plane albedo                  
+                 
                        rp(m)=answer(m)**ak1
-c     derivation of snow reflectance function                      
                        refl(m)=r0*answer(m)**xxx
                        
  1989               continue
 
+                    
+                if (toa(21).lt.0.5) go to 19644
                     
 c:          remaining channels                    
                      do 1890 m=18,21                                
@@ -507,7 +530,19 @@ c     derivation of plane albedo
                        rp(m)=answer(m)**ak1
 c     derivation of snow reflectance function                      
                        refl(m)=r0*answer(m)**xxx
-1890            continue
+ 1890               continue
+                    go to 1964
+
+
+                    
+19644           continue
+                 do 1891 m=18,21                                
+                  
+c     derivation of plane albedo                  
+                       rp(m)=answer(m)**ak1
+c     derivation of snow reflectance function                      
+                       refl(m)=r0*answer(m)**xxx
+ 1891                  continue
                     
 1964       CONTINUE
             
@@ -582,33 +617,290 @@ c     spherical albedo
                 
 c     polluted snow
                 
-c     plane albedo
-                  NSOLO=0
-                  wavka=0.865
-                    call qsimp(funs,wave1,wave2,p1)
-                    rp1=p1/sol1
-                    
-                     call qsimp(funs,wave2,wavka,p20)
-                     call qsimp(funp,wavka,wave3,p21)
-                    rp2=(p20+p21)/sol2
-                    rp3=(p1+p20+p21)/sol3
-c     write(*,*) wave1,wave2,wavka,wave3,p1,p20,p21
-                    
+
+c              NEW CODE FOR BBA OF BARE ICE
+c     ALEX 29.08.2019
+
+c     this code calculates bba analytically
+      
+c     input
+
+
+c     wavelengths
+      alam1=0.3
+      alam2=0.4
+      alam3=0.56
+      alam4=0.7
+      alam5=0.709
+      alam6=0.753
+      alam7=0.865
+      alam8=1.02
+      alam9=2.4
+      
 c     spherical albedo
-                    NSOLO=1
-                    wavka=0.865
-                            call qsimp(funs,wave1,wave2,s1)
-c                    s1=psi(wave2)-psi(wave1)
-c                    rs1=s1/sol1
-                            rs1=s1/sol1
+c 1)      
+c     400nm    
+c      r2=0.5735
+c     560
+c      r3=0.5321
+c    709
+c      r5=0.5226
+      
+c     2)
+      
+c     754
+c      r6=0.5072
+
+c     865      
+c      r7=0.4472
+      
+c    1020
+c      r8=0.2561
+c-------------------------
+      r2=toa(1)
+      r3=toa(6)
+      r5=toa(11)
+      r6=toa(12)
+      r7=toa(17)
+      r8=toa(21)
+c      ------------------------------
+c     QUADRATIC POLYNOMIAL for the range 709-865nm
+
+
+      x0=alam5
+      x1=alam6
+      x2=alam7
+      y0=r5
+      y1=r6
+      y3=r7
+                          d1=(x0-x1)*(x0-x2)
+                          d2=(x1-x0)*(x1-x2)
+                          d3=(x2-x0)*(x2-x1)
+
+                           a2=x1*x2*y0/d1+x0*x2*y1/d2+x0*x1*y2/d3
+                           b2=-(x1+x2)*y0/d1-(x0+x2)*y1/d2-(x0+x1)*y2/d3
+                           c2=y0/d1+y1/d2+y2/d3
+                           x=x1
+                           sa1=a2+b2*x+c2*x*x
+                       
+c     QUADRATIC POLYNOMIAL for the range 400-709nm
+
+
+      x0=alam2
+      x1=alam3
+      x2=alam5
+      y0=r2
+      y1=r3
+      y3=r5
+                          d1=(x0-x1)*(x0-x2)
+                          d2=(x1-x0)*(x1-x2)
+                          d3=(x2-x0)*(x2-x1)
+
+                           a1=x1*x2*y0/d1+x0*x2*y1/d2+x0*x1*y2/d3
+                           b1=-(x1+x2)*y0/d1-(x0+x2)*y1/d2-(x0+x1)*y2/d3
+                           c1=y0/d1+y1/d2+y2/d3
+                           x=x1
+                           sa1=a1+b1*x+c1*x*x
+                        
+
+                           
+c     exponential approximation for the range above 0.865nm
+                           x0=    alam7
+                           x1=    alam8
+                           rati=r7/r8
+                           alasta=(x1-x0)/alog(rati)
+                           an=1./alasta
+                           p=r7*exp(x0/alasta)
+                         
+                           x=alam8
+                           sa1=p*exp(-x/alasta)
+                       
+c     END of approximations for 3 intervals
+
+c     approximation for the solar flux
+c     f=f0+f1*exp(-bet*lambda/star1)+f2*exp(-gam*lambda)
+                             f0=32.38
+                             f1=-160140.33
+                             f2=7959.53
+                             bet= 1./0.08534
+                             gam=1./0.40179
+
+c     ANALYTICAL INTEGRATION OF SOLAR FLUX (DOMINATOR)
+
+                           
+                             z1=0.3
+                             z2=0.7
+                             
+                             sol1a=f0*(z2-z1)
+                             adx1= exp(-bet*z2)
+                           
+                             adx2=exp(-bet*z1)
+                          
+                             addx=dx1-dx2
+                           sol1b=-f1*(  exp(-bet*z2) -exp(-bet*z1)) /bet
+                           
+                           sol1c=-f2*(  exp(-gam*z2)-exp(-gam*z1))/gam
+                           
+                           sol1=sol1a+sol1b+sol1c
+c                       write(*,*) sol1a,sol1b,sol1c,bet,z1,z2,gam,f1,f2
+                     
+                           
+                              z1=0.7
+                              z2=2.4
+                                   sol1a=f0*(z2-z1)
+                             adx1= exp(-bet*z2)
                             
-c     s2a=psi(wave2)-psi(wavka)
-                    call qsimp(funs,wave2,wavka,s2a)        
-                    call qsimp(funp,wavka,wave3,s2b)
-                    s2=s2a+s2b
+                             adx2=exp(-bet*z1)
+                          
+                             addx=dx1-dx2
+                           sol1b=-f1*(  exp(-bet*z2) -exp(-bet*z1)) /bet
+                           
+                           sol1c=-f2*(  exp(-gam*z2)-exp(-gam*z1))/gam
+                     sol2=sol1a+sol1b+sol1c
+                     
+                     sol3=sol1+sol2
+c*************************************************                     
+                              z1=0.7
+                              z2=0.865
+                                   asol1a=f0*(z2-z1)
+                          
+                     asol1b=-f1*(  exp(-bet*z2) -exp(-bet*z1)) /bet
+                           
+                    asol1c=-f2*(  exp(-gam*z2)-exp(-gam*z1))/gam
+                     asol=asol1a+asol1b+asol1c
+c*******************************************************                    
+              
+
+                     
+c                     write(*,*) sol1,sol2,sol3
+c                     write(*,*)
+c                     write(*,*)
+c     END
+
+
+                     
+c     ANALYTICAL EQUATION FOR THE NOMINATOR
+c     integration over 3 segments
+                     
+c     segment 1                     
+                     z1=0.3
+                     z2=0.7
+
+
+                     
+                     ajx1=a1*sol1
+c*************************************                   
+                     
+                     ak1=(z2**2.-z1**2.)/2.
+                     
+                     ak2=(z2/bet+1./bet/bet)*exp(-bet*z2)-
+     c                    (z1/bet+1./bet/bet)*exp(-bet*z1)
+                     
+                     ak3=(z2/gam+1./gam/gam)*exp(-gam*z2)-
+     c                    (z1/gam+1./gam/gam)*exp(-gam*z1)
+                     
+                     ajx2=b1*(f0*ak1  -f1*ak2  -f2*ak3 )
+c************************************************************
+
+
+
+                     
+                     am1=(z2**3.-z1**3.)/3.
+                     
+      am2=(z2**2./bet+2.*z2/bet/bet+2./bet/bet/bet)*exp(-bet*z2)-
+     c         (z1**2./bet+2.*z1/bet/bet+2./bet/bet/bet)*exp(-bet*z1)
+            
+        am3=(z2**2./gam+2.*z2/gam/gam+2./gam**3.)*exp(-gam*z2)-
+     c           (z1**2./gam+2.*z1/gam/gam+2./gam**3.)*exp(-gam*z1)
+    
+             ajx3=c1*(f0*am1 -f1*am2 -f2*am3)
+c**************************************************************
+
+
+             
+             aj1=ajx1+ajx2+ajx3
+             
+                
+                     
+                      z1=0.7
+                      z2=0.865
+                 
+                      
+c             segment 2                      
+c                     write (*,*) 'segment2'
                     
-                    rs2=s2    /sol2
-                    rs3=(s1+s2)      /sol3
+
+                         cajx1=a2*asol
+c*************************************                   
+                     
+                     ak1=(z2**2.-z1**2.)/2.
+                     
+                     ak2=(z2/bet+1./bet/bet)*exp(-bet*z2)-
+     c                    (z1/bet+1./bet/bet)*exp(-bet*z1)
+                     
+                     ak3=(z2/gam+1./gam/gam)*exp(-gam*z2)-
+     c                    (z1/gam+1./gam/gam)*exp(-gam*z1)
+                     
+                     
+                     cajx2=b2*(f0*ak1  -f1*ak2  -f2*ak3 )
+c************************************************************
+                  
+
+
+                     
+                     am1=(z2**3.-z1**3.)/3.
+                     
+      am2=(z2**2./bet+2.*z2/bet/bet+2./bet/bet/bet)*exp(-bet*z2)-
+     c         (z1**2./bet+2.*z1/bet/bet+2./bet/bet/bet)*exp(-bet*z1)
+            
+        am3=(z2**2./gam+2.*z2/gam/gam+2./gam**3.)*exp(-gam*z2)-
+     c           (z1**2./gam+2.*z1/gam/gam+2./gam**3.)*exp(-gam*z1)
+c********************************************************************
+
+
+        
+             cajx3=c2*(f0*am1 -f1*am2 -f2*am3)
+c**************************************************************
+
+             
+              
+                  caj2=cajx1+cajx2+cajx3
+             
+            
+                  
+c     segment 3
+                     
+                      z1=0.865
+                      z2=2.4
+
+             aj31=(1./an)*(exp(-an*z2)-exp(-an*z1))
+                      
+             aj32=(1./(bet+an))*(exp(-(bet+an)*z2)-exp(-(an+bet)*z1))
+                      
+             aj33=(1./(gam+an))*(exp(-(gam+an)*z2)-exp(-(an+gam)*z1))
+               
+               caj3=(-f0*aj31-f1*aj32-f2*aj33)*p
+c*************************************************************************
+               
+                     ajto=aj1+caj2+caj3
+                 
+                     bbat=ajto/sol3
+                     bbavis=aj1/sol1
+                     bbanir=(caj2+caj3)/sol2
+c                     write(*,*) aj1,caj2,caj3,ajto
+                     
+c                    write(*,*) bbat, bbavis, bbanir
+                     
+                     rp3=bbat
+                     rp1=bbavis
+                     rp2=bbanir
+
+
+
+                
+c     end of modification  AUGUST 29, 2019
+                     
+
                     
 1945       CONTINUE
            write(557,33) ns,ndate(3),alat,alon,rp3,rp1,rp2,rs3,rs1,
@@ -624,8 +916,8 @@ c     s2a=psi(wave2)-psi(wavka)
            icloud=0
            
  87     continue
- 33     format(i5,i9,3x,8f10.4,i4)
- 333    format(i5,i9,2x,f10.4,i4)
+ 33     format(i15,i19,3x,8f10.4,i4)
+ 333    format(i15,i19,2x,f10.4,i4)
         stop
         end
       
@@ -751,7 +1043,12 @@ c******************************************************************
 
       
 c     MAIN FUNCTION
-c DETERMINATION OF THE TOA reflectance as function of snow spherical albedo a      
+c     DETERMINATION OF THE TOA reflectance as function of snow spherical albedo a
+
+
+
+
+      
                          FUNCTION  fun(a)
             common sza,vza,raa, g, wave,rtoa ,r0,height,aot
                                         pi=acos(-1.)
