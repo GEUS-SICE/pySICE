@@ -1,17 +1,19 @@
            program SICE
       
-c                   VERSION 1.0
+c                   VERSION 1.1
       
 c     This code retrieves snow/ice  albedo
 c               and related snow products
 c              for clean Arctic atmosphere
 
 c     The errors increase with the load of
-c                      pollutants in air
-      
-c                         21.05.2019
+c     pollutants in air
 
-      
+ 
+c***************************************************     
+c                         21.05.2019
+c                     correction: Alex: 09.06.2019
+c***************************************************     
 c                      Alexander  KOKHANOVSKY
 c     a.kokhanovsky@vitrocisetbelgium.com
 
@@ -21,13 +23,13 @@ c                    satellite and solar angles, lat, lon, height_of_ground_in_m
 c     output:    albedo, snow grain size, snow specific surface area,
 c                    concentration and type/properties  of pollutants in snow, etc.
       
-           real           answer(21),    
+           real           answer(21),   tozon(21), 
      c                      w(21),            toa(21),
      c                      refl(21),rp(21),bai(21),xa(168),ya(168)
                integer ndate(6) 
                 external fun,sobthv,psi,funp,funs
                 
-                common sza,vza,raa, g, wave,rtoa ,r0, height
+                common sza,vza,raa, g, wave,rtoa ,r0, height,aot
                 
                 common /quatro/x0,x1,x2,y0,y1,y2,ak1
                 
@@ -97,19 +99,35 @@ c     OLCI TOA reflectance at 21 channels
 c                     open(1,file='olci_toa.dat')
 c                     open(1,file='/home/vtcb/snow/sice1mirror/proc_input
 c     c/v2_2_test/output/max_egp_olci.dat')
+                     
 c     number of lines to read
+                     
                      open(1,file='olci_toa.dat')
                      open(101,file='nlines.dat')
-c     assumed AOT for THV clean-polluted snow
-c                 adviced AOT=0.6                     
+c
+c                     assumed date
+                     ndate(3)=010120
+c     assumed AOT at 500nm for THV clean and polluted snow
+                            AOT=thv                   
                      open(102,file='thv.dat')
+
+                     
 c     imaginary part of ice refractive index
                      open(5000,file='ice_index.dat')
                      open(2099,file='interm.dat')
                      open(1212, file='interm_alb.dat')
+                     
 c***************************************************************************
-        
-            
+c                  Alex 09.06.2019
+c     ozone vertical absorption thickness        
+                     open(1975,file='tg_vod.dat')
+                     read(1975,*)
+                     read(1975,*)
+                     do 1976 np=1,21
+                        read(1975,*)dlin,tozon(np)
+ 1976            continue
+
+                     
 c     output
                  
                  open(157,  file= 'spherical_albedo.dat' )
@@ -124,7 +142,7 @@ c               number of lines to be processed
                  read( 101,*) nlines
 
                  
-c                pre-assumed number: AOT-aerosol optical thickness         
+c                pre-assumed number: AOT-aerosol optical thickness  at 500nm       
                  read(102,*) AOT
 
 c                reading ice refractive index
@@ -135,6 +153,7 @@ c                reading ice refractive index
 
           icloud=0
           iice=0
+          scale=acos(-1.)/180.
 c!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!         
 c              -START-           OF MAIN ROUTINE:
 c!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -142,9 +161,17 @@ c!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                  do 87 J=1,nlines
            
           read(1,*,end=87) ns,alat,alon,sza,vza,saa,vaa,height,
-     c   (toa(iks),iks=1,21)
-          if(toa(21).lt.0.4) iice=1
-                  if(toa(21).lt.0.4) go to 8797
+     c                   (toa(iks),iks=1,21)
+c            Alex
+          amf=1./cos(sza*scale)+1./cos(vza*scale)
+          do 1941 nv=1,21
+c             write(*,*) toa(nv),amf,tozon(nv)
+             toa(nv)=toa(nv)*exp(amf*tozon(nv))
+ 1941        continue
+          
+             if(toa(21).lt.0.3) iice=1
+         
+                  if(toa(21).lt.0.3) go to 8797
 c     transfer of OLCI relative azimuthal angle to the definition used in
 c     radiative transfer code                    
                     raa=180.-(vaa-saa)
@@ -210,8 +237,8 @@ c                  effective absorption length(mm)
 c                  effective grain size(mm):diameter
                     D=al/16.36
                     
-                    if (d.lt.0.2) icloud=1
-                    if (d.lt.0.2) go to 8797
+                    if (d.lt.0.1) icloud=1
+                    if (d.lt.0.1) go to 8797
 c                  snow specific area ( dimension: m*m/kg)
                     densit=0.917
                     area=   6./D/densit
@@ -224,11 +251,12 @@ c     checking for type of snow: clean or polluted
 c     polluted snow - small TOA(1)
 c      atmosphere with AOT=0.8 at 400nm is assumed
 c     AOT=0.6 ( see thv.dat)
-                    thv=0.0
+c                    Alex 09.06.2019                    
+c                    thv=0.0
                     THV=SOBTHV(AOT)
                  
                            isnow=1
-c                        write(2099,*) ndate(3),toa(1),thv
+                        write(2099,*) ndate(3),toa(1),thv
                        if ( toa(1).lt.THV) go to 1961
 c**********************************************************
  9393                       continue
@@ -363,24 +391,39 @@ c     volumetric absorption coefficient of dust
                  
  1577          continue
 
+
+
+
+c     Alex   09.06.2019
+
+
+                       
 c                   reprocessing of albedo
 c     to remove gaseous absorption
-c     using QPA ( quadratic polynomila approximation in the range 400-865nm)
+c     using LPA ( linear polynomial approximation in the range 753-778nm)
               
 c      comment:       in the range >865nm the physical interpolation is used
-              x0=0.4
-              x1=0.442
-              x2=0.865
-              y0=answer(1)
-              y1=answer(3)
-              y2=answer(17)
+             
+              x1=0.753
+              x2=0.778
+             
+              y1=answer(12)
+              y2=answer(16)
               
-               do 1989 m=1,17
-                        x=w(m)
-                       B0= (x-x1) * ( x-x2) /   (x0-x1) / ( x0-x2)          
-                       B1= (x-x0) * ( x-x2) /   (x1-x0) / ( x1-x2)     
-                       B2= (x-x0) * ( x-x1) /   (x2-x0) / ( x2-x1)
-                       answer(m)=y0*B0+y1*B1+y2*B2
+               afirn=(y2-y1)/(x2-x1)
+               bfirn=y2-afirn*x2
+               answer(13)=bfirn+afirn*0.761
+               answer(14)=bfirn+afirn*0.764
+               answer(15)=bfirn+afirn*0.767
+
+               
+c                 first channels:              
+                 do 1989 m=1,17
+c                        x=w(m)
+c                       B0= (x-x1) * ( x-x2) /   (x0-x1) / ( x0-x2)          
+c                       B1= (x-x0) * ( x-x2) /   (x1-x0) / ( x1-x2)     
+c                       B2= (x-x0) * ( x-x1) /   (x2-x0) / ( x2-x1)
+c                       answer(m)=y0*B0+y1*B1+y2*B2
                        
 c     derivation of plane albedo                  
                        rp(m)=answer(m)**ak1
@@ -388,7 +431,9 @@ c     derivation of snow reflectance function
                        refl(m)=r0*answer(m)**xxx
                        
  1989               continue
+
                     
+c:          remaining channels                    
                      do 1890 m=18,21                                
                         answer(m)=exp(-sqrt(4.*1000.*AL*pi*bai(m)/w(m)))
 c     derivation of plane albedo                  
@@ -512,8 +557,8 @@ c     s2a=psi(wave2)-psi(wavka)
            icloud=0
            
  87     continue
- 33     format(i5,i5,3x,8f10.4,i4)
- 333    format(i5,i5,2x,f10.4,i4)
+ 33     format(i5,i9,3x,8f10.4,i4)
+ 333    format(i5,i9,2x,f10.4,i4)
         stop
         end
       
@@ -525,7 +570,7 @@ c     USED FUNCTIONS:
 
 c                          POLLUTION MASK
 
-                       FUNCTION sobthv(AOT)
+                       FUNCTION sobthv(AOTs)
       
                real as(4), bs(4), cs(4), als(4), bets(4)
             
@@ -535,7 +580,7 @@ c                          POLLUTION MASK
             data als/  0.16775, -0.06969,  0.08093,     -0.08903/
             data bets/  1.09188,  0.08994,  0.49647,   -0.75218/
             
-           common sza,vza,raa, g, wave,rtoa ,r0,height
+           common sza,vza,raa, g, wave,rtoa ,r0,height,aot
                wawa=0.4
                     pi=acos(-1.)
 
@@ -556,8 +601,9 @@ c                          POLLUTION MASK
 
                     
 c     AOT
-                    tauaer=aot
-c                    tauaer=AOT500*(wave/0.5)**(-1.3)
+c                    tauaer=aot
+c                Alex  09.06.2019                   
+                    tauaer=AOTs*(0.4/0.5)**(-1.3)
                     ad=height/7400.
                     AK=1.
                     if (ad.gt.1.e-6) AK=exp(-ad)
@@ -640,7 +686,7 @@ c******************************************************************
 c     MAIN FUNCTION
 c DETERMINATION OF THE TOA reflectance as function of snow spherical albedo a      
                          FUNCTION  fun(a)
-            common sza,vza,raa, g, wave,rtoa ,r0,height
+            common sza,vza,raa, g, wave,rtoa ,r0,height,aot
                                         pi=acos(-1.)
 c****************************************************
                     
@@ -661,7 +707,9 @@ c****************************************************
 
                     
 c     AOT
-                    tauaer=0.07*(wave/0.5)**(-1.3)
+c     tauaer=0.07*(wave/0.5)**(-1.3)
+c                 ALEX 09.06.2019                    
+                                 tauaer=AOT*(wave/0.5)**(-1.3)
                     ad=height/7400.
                     AK=1.
                     if (ad.gt.1.e-6) AK=exp(-ad)
@@ -722,7 +770,7 @@ c******************************************************************
 c                SPHERICAL ALBEDO OF TERRESTRIAL ATMOSPHERE:      
 
              FUNCTION SALBED(tau)
-            common sza,vza,raa, g, wave,rtoa ,r0,height
+            common sza,vza,raa, g, wave,rtoa ,r0,height,aot
              
             real as(4), bs(4), cs(4), als(4), bets(4)
             
@@ -760,7 +808,7 @@ c                SPHERICAL ALBEDO OF TERRESTRIAL ATMOSPHERE:
       
 c     SOLAR SPECTRUM at GROUND level
       
-                     function sol(x)
+                      function sol(x)
       
                            a=   32.38
                            b=   -160140.33
