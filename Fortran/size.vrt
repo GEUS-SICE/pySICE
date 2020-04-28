@@ -1,0 +1,7 @@
+<OGRVRTDataSource>
+<OGRVRTLayer name="size">
+<SrcDataSource>size.csv</SrcDataSource>
+<GeometryType>wkbPoint</GeometryType>
+<GeometryField encoding="PointFromColumns" x="alon" y="alat"/>
+</OGRVRTLayer>
+</OGRVRTDataSource>
