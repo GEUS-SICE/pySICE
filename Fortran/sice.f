@@ -1,13 +1,6 @@
       program SICE
       
-c     version 5.1
-c          April 17, 2020      
-c     new approximation
-c      for the backscattering fraction has been used
-c     A. KOKHANOVSKY
-
-      
-c      version 5.0
+c      version 5.2
 c      LUT for clean snow BBA is introduces
 c      March 31, 2020
       
@@ -22,7 +15,7 @@ c      version 5.0
 c      LUT for clean snow BBA is introduces
 c      March 31, 2020
       
-c________version 3.5  NOVEMBER 18, 2019
+c _______version 3.5  NOVEMBER 18, 2019
 c           Wiscombe equation for B      used      
 c     version 3.4
 c     NOVEMBER 8 2019
@@ -88,7 +81,8 @@ c                    concentration and type/properties  of pollutants in snow, e
      c                      w(21),            toa(21), golci(21),
      c     refl(21),rp(21),bai(21),xa(168),ya(168)
      
-               integer ndate(6) 
+           integer ndate(6)
+           
                 external fun,sobthv,psi,funp,funs
                 
                 common sza,vza,raa, g, wave,rtoa ,r0, height,aot
@@ -1064,27 +1058,61 @@ c     solar flux calculation
                 sol3= sol1  +  sol2
                 
                 if (isnow.eq.1) go to 1924
+
+c**********************************************************************
                 
-c                clean snow
+c     analytical equations for clean snow BBA
+c     Alex
+c                      April 1, 2020                
+c     clean snow
+                diam=D*1000.
+        
+               
                 
 c     plane albedo
                 NSOLO=0
-                    call qsimp(funp,wave1,wave2,p1)
-                    rp1=p1/sol1
+c                    call qsimp(funp,wave1,wave2,p1)
+c                    rp1=p1/sol1
                    
-                    call qsimp(funp,wave2,wave3,p2)
-                    rp2=p2/sol2
-                    rp3=(p1+p2)/sol3
+c                    call qsimp(funp,wave2,wave3,p2)
+c                    rp2=p2/sol2
+c                    rp3=(p1+p2)/sol3
                     
+                    anka= 0.7389  -0.1783*am1     +0.0484*am1**2.
+                    banka=0.0853  +0.0414*am1     -0.0127*am1**2.
+                    canka=0.1384  +0.0762*am1     -0.0268*am1**2.
+                    diam1=187.89  -69.2636*am1     +40.4821*am1**2.
+                    diam2=2687.25 -405.09*am1   +94.5*am1**2.
+                    
+             rp3=anka+banka*exp(-diam/diam1)+canka*exp(-diam/diam2)
+     
+             
 c     spherical albedo
-                    NSOLO=1
-                    call qsimp(funp,wave1,wave2,s1)
-                    rs1=s1/sol1
-                    call qsimp(funp,wave2,wave3,s2)
-                    rs2=s2/sol2
-                    rs3=(s1+s2)/sol3
+            NSOLO=1
+       
+c                    call qsimp(funp,wave1,wave2,s1)
+c                    rs1=s1/sol1
+c                    call qsimp(funp,wave2,wave3,s2)
+c                    rs2=s2/sol2
+c                    s3k=s1+s2
+c                    rs3=(s1+s2)/sol3
+
+                 
+               
+                    anka= 0.6420
+                    banka=0.1044
+                    canka=0.1773
+                    diam1=158.62
+                    diam2=2448.18
+                 
                     
-                    go to 1945
+             rs3=anka+banka*exp(-diam/diam1)+canka*exp(-diam/diam2)
+                    
+           
+c**********************************************************************
+                    
+             go to 1945
+             
  1924           continue
 
                 
@@ -1413,8 +1441,8 @@ c     end of modification  AUGUST 29, 2019
 
                     
 1945       CONTINUE
-           write(557,33) ns,ndate(3),alat,alon,rp3,rp1,rp2,rs3,rs1,
-     c      rs2,isnow
+           write(557,33) ns,ndate(3),alat,alon,rp3,rs3,
+     c      isnow
            write(5570,333)ns,ndate(3),rp3,isnow
            
            go to 87
@@ -1426,7 +1454,7 @@ c     end of modification  AUGUST 29, 2019
            icloud=0
            
  87     continue
- 33     format(i15,i19,3x,8f10.4,i4)
+ 33     format(i15,i19,3x,4f10.4,i4)
  333    format(i15,i19,2x,f10.4,i4)
         stop
         end
@@ -1508,27 +1536,25 @@ c                                  SOBOLEV
                R=RSS+RMS
                
 c              t1=exp(-(1.-g)*tau/am1/2.)
-c     t2=exp(-(1.-g)*tau/am2/2.)
-               
-c          Alex   APRIL 17, 2020
-      
-c         wa1=1.10363
-c         wa2=-6.70122
-         
-c         wx0=2.19777
-c         wdx=0.51656
-         
-c         bex=exp   (  (g-wx0)/wdx )
-c         sssss=  (wa1-wa2)/(1.+bex)+wa2        
-                 
-c               t1=exp(-(1.-g)*tau/am1/2./sssss)
-c     t2=exp(-(1.-g)*tau/am2/2./sssss)
+c              t2=exp(-(1.-g)*tau/am2/2.)
 
-       BAP=(1.+gaer)/sqrt(1.+gaer*gaer)-1.
-               BAPTG=(1.-gaer)*BAP/2./gaer
-               BAPT=0.5*taumol+BAPTG*tauaer
-               t1=exp(-BAPT/am1)
-               t2=exp(-BAPT/am2)
+      
+         wa1=1.10363
+         wa2=-6.70122
+         
+         wx0=2.19777
+         wdx=0.51656
+         
+         bex=exp   (  (g-wx0)/wdx )
+         sssss=  (wa1-wa2)/(1.+bex)+wa2
+         
+       
+        
+         
+                 
+               t1=exp(-(1.-g)*tau/am1/2./sssss)
+               t2=exp(-(1.-g)*tau/am2/2./sssss)
+
 
             
                 a=0.
@@ -1649,29 +1675,22 @@ c     t2=exp(-(1.-g)*tau/am2/2.)
 
              
        
-c            Alex 17.04.2020         
-c         wa1=1.10363
-c         wa2=-6.70122
          
-c         wx0=2.19777
-c         wdx=0.51656
+         wa1=1.10363
+         wa2=-6.70122
          
-c         bex=exp   (  (g-wx0)/wdx )
-c         sssss=  (wa1-wa2)/(1.+bex)+wa2
+         wx0=2.19777
+         wdx=0.51656
+         
+         bex=exp   (  (g-wx0)/wdx )
+         sssss=  (wa1-wa2)/(1.+bex)+wa2
          
        
         
          
                  
-c               t1=exp(-(1.-g)*tau/am1/2./sssss)
-c               t2=exp(-(1.-g)*tau/am2/2./sssss)
-
-       BAP=(1.+gaer)/sqrt(1.+gaer*gaer) -1.
-               BAPTG=(1.-gaer)*BAP/2./gaer
-               BAPT=0.5*taumol+BAPTG*tauaer
-               t1=exp(-BAPT/am1)
-               t2=exp(-BAPT/am2)
-               
+               t1=exp(-(1.-g)*tau/am1/2./sssss)
+               t2=exp(-(1.-g)*tau/am2/2./sssss)
 c                   END OF CORRECTION
                
                ratm=salbed(tau)
@@ -1893,62 +1912,7 @@ c!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
       
 
-c                       integration routine
 
-             SUBROUTINE qsimp(func,a,b,s)
-              INTEGER JMAX
-               REAL a,b,func,s,EPS
-                 EXTERNAL func
-                    PARAMETER (EPS=1.e-3, JMAX=20)
-
-                       INTEGER j
-                       REAL os,ost,st
-               
-                        ost=-1.e30
-                        os= -1.e30
-      
-                       do 11 j=1,JMAX
-          
-                            call trapzd(func,a,b,st,j)
-                                s=(4.*st-ost)/3.
-       
-                                  if (j.gt.5) then
-          if (abs(s-os).lt.EPS*abs(os).or.(s.eq.0..and.os.eq.0.)) return
-          endif
-          os=s
-          ost=st
-11        continue
-          
-          END
-      
-      
-c     integration routine
-      
-                      SUBROUTINE trapzd(func,a,b,s,n)
-                       INTEGER n
-                          REAL a,b,s,func
-                          EXTERNAL func
-                            INTEGER it,j
-                            REAL del,sum,tnm,x
-                 
-                                if (n.eq.1) then
-                            s=0.5*(b-a)*(func(a)+func(b))
-       
-                          else
-                          it=2**(n-2)
-                         tnm=it
-                          del=(b-a)/tnm
-                          x=a+0.5*del
-                              sum=0.
-                       do 11 j=1,it
-                        sum=sum+func(x)
-                       x=x+del
-11                         continue
-                              s=0.5*(s+(b-a)*sum/tnm)
-        
-                     endif
-
-                     END
 
 
       
