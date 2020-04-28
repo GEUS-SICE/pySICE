@@ -120,107 +120,90 @@ import rasterio as rio
 import time
 start_time = time.time()
 
-import sys
-#InputFolder = sys.argv[1] + '/'
-def sice(folder):
-    InputFolder = folder
+InputFolder = '../out/Tedstone_test2/20170715T135846/'
 
-    #%% ========= input tif ================
-    print("Reading input ")
-    
-    Oa01 = rio.open(InputFolder+'r_TOA_01.tif')
-    meta = Oa01.meta
-    
-    def WriteOutput(var,var_name,in_folder):
-        # this functions write tif files based on a model file, here "Oa01"
-        # opens a file for writing
-        with rio.open(in_folder+var_name+'.tif', 'w+', **meta) as dst:
-            dst.write(np.reshape(var,np.shape(Oa01)),1)
-        
-        # calculates x, y and z 2D grids
-        l,b,r,t = Oa01.bounds
-        res = Oa01.res
-        x = np.arange(l,r, res[0])
-        y = np.arange(t,b, -res[0])
-        z=np.reshape(var,np.shape(Oa01))
-        return x, y, z
-        
-        
-    olci_data = np.tile(Oa01.read(1).flatten()*np.nan, (21,1)).transpose()
-    
-    for i in range(21):
-        dat = rio.open((InputFolder+'r_TOA_'+str(i+1).zfill(2)+'.tif'))
-        olci_data[:,i] = dat.read(1).flatten()
-        
-    ozone = rio.open(InputFolder+'O3.tif').read(1).flatten()
-    water = rio.open(InputFolder+'WV.tif').read(1).flatten()
-    sza = rio.open(InputFolder+'SZA.tif').read(1).flatten()
-    saa = rio.open(InputFolder+'SAA.tif').read(1).flatten()
-    vza = rio.open(InputFolder+'OZA.tif').read(1).flatten()
-    vaa = rio.open(InputFolder+'OAA.tif').read(1).flatten()
-    height = rio.open(InputFolder+'height.tif').read(1).flatten()
-    mask = rio.open(InputFolder+'mask.tif').read(1).flatten()
-    
-    #cloud_an_137 = rio.open(InputFolder+'cloud_an_137.tif').read(1).flatten()
-    #cloud_an_gross = rio.open(InputFolder+'cloud_an_gross.tif').read(1).flatten()
-    #cloud_an_thin_cirrus = rio.open(InputFolder+'cloud_an_thin_cirrus.tif').read(1).flatten()
-    
-    water_vod = genfromtxt('./tg_water_vod.dat', delimiter='   ')
-    voda = water_vod[range(21),1]
-    
-    ozone_vod = genfromtxt('./tg_vod.dat', delimiter='   ',skip_header=2)
-    tozon = ozone_vod[range(21),1]
-    aot = 0.1
-       
-    #%% Running sice
-    print("Running sice")
-    start_time = time.time()
-    BXXX, isnow, D, area, al, r0, isnow, conc, ntype, rp1, rp2, rp3, rs1, rs2, rs3 =  \
-    vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, \
-    vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, \
-    vaa*np.nan, vaa*np.nan, vaa*np.nan
-    
-    alb_sph, rp,refl =  olci_data*np.nan, olci_data*np.nan, olci_data*np.nan
-    
-    from tqdm import tqdm
-    
-    for i in  tqdm(range(len(vaa))):
-#        if (mask[i] != 3): continue
-    #    if ((cloud_an_gross[i] == 1) or (cloud_an_137[i] == 1) or (cloud_an_thin_cirrus[i] == 1)): continue
-        if (sza[i] > 75): continue
-        if (olci_data[i][20] > 0.76):
-            isnow[i] = 8
-            continue
-        if (olci_data[i][20] < 0.1):
-            isnow[i] = 4
-            continue
-        if np.any(np.isnan(olci_data[i])):
-            continue
-    
-        BXXX[i], D[i], area[i], al[i], r0[i], isnow[i], conc[i], ntype[i], alb_sph[i,:], \
-            rp[i,:],refl[i,:], rp1[i], rp2[i], rp3[i], rs1[i], rs2[i], rs3[i] \
-            = sl.pySICE( sza[i], vza[i], saa[i], vaa[i], height[i], olci_data[i], ozone[i],\
-                         water[i], voda, tozon, aot)
-        
-    WriteOutput(BXXX,   '03_SICE',   InputFolder)
-    WriteOutput(D,      'D',InputFolder)
-    WriteOutput(area,   'area', InputFolder)
-    for i in range(21):
-        WriteOutput(refl[:,i],   'r_BOA_'+str(i+1).zfill(2), InputFolder)
+#%% ========= input tif ================
+print("Reading input ")
 
-    # WriteOutput(al,   'al_py',     InputFolder)
-    # WriteOutput(r0,   'r0_py',InputFolder)
-    # WriteOutput(isnow,'isnow_py',InputFolder)
-    # WriteOutput(conc, 'conc_py',InputFolder)
-    # WriteOutput(ntype,'ntype_py',InputFolder)
-    # WriteOutput(rp1,  'rp1_py',InputFolder)
-    # WriteOutput(rp2,  'rp2_py',InputFolder)
-    WriteOutput(rp3,    'SnBBA',InputFolder)
-    WriteOutput(rs1,  'rs1',InputFolder)
-    WriteOutput(rs2,  'rs2',InputFolder)
-    WriteOutput(rs3,  'rs3',InputFolder)
-    # for i in np.arange(21): WriteOutput(refl[:,i],    'r_BOA_'+str(i), InputFolder)
+Oa01 = rio.open(InputFolder+'Oa01_reflectance.tif')
+meta = Oa01.meta
+
+def WriteOutput(var,var_name,in_folder):
+    # this functions write tif files based on a model file, here "Oa01"
+    # opens a file for writing
+    with rio.open(in_folder+var_name+'.tif', 'w+', **meta) as dst:
+        dst.write(np.reshape(var,np.shape(Oa01)),1)
     
-    print("Writing %s --- %s seconds ---" % (InputFolder, time.time() - start_time))
+    # calculates x, y and z 2D grids
+    l,b,r,t = Oa01.bounds
+    res = Oa01.res
+    x = np.arange(l,r, res[0])
+    y = np.arange(t,b, -res[0])
+    z=np.reshape(var,np.shape(Oa01))
+    return x, y, z
+    
+    
+olci_data = np.tile(Oa01.read(1).flatten()*np.nan, (21,1)).transpose()
+
+for i in range(21):
+    dat = rio.open((InputFolder+'Oa'+str(i+1).zfill(2)+'_reflectance.tif'))
+    olci_data[:,i] = dat.read(1).flatten()
+    
+ozone_dat = rio.open(InputFolder+'ozone.tif')
+ozone = ozone_dat.read(1).flatten()
+water_dat = rio.open(InputFolder+'water.tif')
+water = water_dat.read(1).flatten()
+ozone = ozone_dat.read(1).flatten()
+sza_dat = rio.open(InputFolder+'SZA.tif')
+sza = sza_dat.read(1).flatten()
+saa_dat = rio.open(InputFolder+'SAA.tif')
+saa = saa_dat.read(1).flatten()
+vza_dat = rio.open(InputFolder+'OZA.tif')
+vza = vza_dat.read(1).flatten()
+vaa_dat = rio.open(InputFolder+'OAA.tif')
+vaa = vaa_dat.read(1).flatten()
+height_dat = rio.open(InputFolder+'height.tif')
+height = height_dat.read(1).flatten()
+
+water_vod = genfromtxt('../SnowProcessor/2.2/tg_water_vod.dat', delimiter='   ')
+voda = water_vod[range(21),1]
+
+ozone_vod = genfromtxt('../SnowProcessor/2.2/tg_vod.dat', delimiter='   ',skip_header=2)
+tozon = ozone_vod[range(21),1]
+aot = 0.1
+   
+#%% Running sice
+print("Running sice")
+
+BXXX, isnow, D, area, al, r0, isnow, conc, ntype, rp1, rp2, rp3, rs1, rs2, rs3 =  \
+vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan
+alb_sph, rp,refl =  olci_data*np.nan, olci_data*np.nan, olci_data*np.nan
+
+from tqdm import tqdm
+
+for i in  tqdm(range(len(vaa))):
+    if(olci_data[i][20]<0.1):
+        isnow[i] = 4
+        continue
+    if np.any(np.isnan(olci_data[i])):
+        continue
+
+    BXXX[i], D[i], area[i], al[i], r0[i], isnow[i], conc[i], ntype[i],alb_sph[i,:], rp[i,:],refl[i,:], rp1[i], rp2[i], rp3[i], rs1[i], rs2[i], rs3[i] = \
+    sl.pySICE(sza[i],vza[i],saa[i],vaa[i],height[i],olci_data[i],ozone[i],water[i],voda,tozon,aot)
+    
+#%% Output generation
+# pick the variable you want to output
+
+WriteOutput(rp1,'rp1_py',InputFolder)
+WriteOutput(rp2,'rp2_py',InputFolder)
+WriteOutput(isnow,'isnow_py',InputFolder)
+WriteOutput(rs1,'rs1_py',InputFolder)
+WriteOutput(rs2,'rs2_py',InputFolder)
+WriteOutput(rs1,'rs1_py',InputFolder)
+WriteOutput(r0,'r0_py',InputFolder)
+WriteOutput(BXXX,'O3_py',InputFolder)
+
+print("Writing output --- %s seconds ---" % (time.time() - start_time))
+start_time = time.time()
 
 
