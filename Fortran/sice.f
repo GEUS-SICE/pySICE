@@ -1,19 +1,30 @@
            program SICE
       
-c                   VERSION 1.1
+c                   VERSION 1.4
       
 c     This code retrieves snow/ice  albedo
 c               and related snow products
-c              for clean Arctic atmosphere
+c     for clean Arctic atmosphere
+
+
+
+c***********************************************      
 
 c     The errors increase with the load of
 c     pollutants in air
-
+c***********************************************
  
 c***************************************************     
-c                         21.05.2019
-c                     correction: Alex: 09.06.2019
-c***************************************************     
+c     1rst version:        21.05.2019
+c     correction: Alex: 09.06.2019
+c     correction: Alex: 14.06.2019
+c     modification: Alex: 28.06.2019 - ozone retrieval is performed
+c***************************************************
+
+
+
+
+      
 c                      Alexander  KOKHANOVSKY
 c     a.kokhanovsky@vitrocisetbelgium.com
 
@@ -103,15 +114,23 @@ c     c/v2_2_test/output/max_egp_olci.dat')
 c     number of lines to read
                      
                      open(1,file='olci_toa.dat')
-                     open(101,file='nlines.dat')
-c
-c                     assumed date
-                     ndate(3)=010120
-c     assumed AOT at 500nm for THV clean and polluted snow
-                            AOT=thv                   
-                     open(102,file='thv.dat')
 
                      
+c     number of lines to read                    
+                     open(101,file='nlines.dat')
+
+c                     assumed date
+                     ndate(3)=010120
+                     
+c     assumed AOT at 500nm for THV clean and polluted snow
+                            AOT=thv                   
+                            open(102,file='thv.dat')
+                            
+c     assumed THVs for the limiting value of the diameter of grains
+c      and for the TOA reflectance at 1020nm                            
+                            open( 1984, file='limits.dat')
+                            read(1984,*) ALR21,ALDI
+                            
 c     imaginary part of ice refractive index
                      open(5000,file='ice_index.dat')
                      open(2099,file='interm.dat')
@@ -119,12 +138,23 @@ c     imaginary part of ice refractive index
                      
 c***************************************************************************
 c                  Alex 09.06.2019
-c     ozone vertical absorption thickness        
+c     ozone vertical absorption thickness
+                     
                      open(1975,file='tg_vod.dat')
+                     
+c     ozone concentration for a given place in kg/m/m                    
+                     open(1973,file='ozone.dat')
+                
+c                retrieved ozone
+                       open(1914,file='retrieved_O3.dat')
+
+
+                     
                      read(1975,*)
                      read(1975,*)
                      do 1976 np=1,21
                         read(1975,*)dlin,tozon(np)
+                       
  1976            continue
 
                      
@@ -154,24 +184,61 @@ c                reading ice refractive index
           icloud=0
           iice=0
           scale=acos(-1.)/180.
+
+
+
+
+
+          
 c!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!         
 c              -START-           OF MAIN ROUTINE:
 c!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
           
                  do 87 J=1,nlines
-           
+c                                           READING OLCI DATA:           
           read(1,*,end=87) ns,alat,alon,sza,vza,saa,vaa,height,
      c                   (toa(iks),iks=1,21)
-c            Alex
-          amf=1./cos(sza*scale)+1./cos(vza*scale)
-          do 1941 nv=1,21
-c             write(*,*) toa(nv),amf,tozon(nv)
-             toa(nv)=toa(nv)*exp(amf*tozon(nv))
- 1941        continue
+
+             
+          read(1973,*) OZON
           
-             if(toa(21).lt.0.3) iice=1
+c          ecmwf ozone in DOBSON UNITS from OLCI file:          
+          totadu=46729.*ozon
+          
+          AKOEF=totadu/404.59
+          
+c!!!!Alex 28.06.2019         
+     
+     
+        
+c     AMF:  Alex
+          
+          amf=1./cos(sza*scale)+1./cos(vza*scale)
+          
+          eps=1.55
+          
+                 BX=(toa(21)**(1.-eps))  * (toa(17)**eps) / toa(7)
+                 BXX=alog(BX)
+                 BXXX=BXX/1.11e-4/amf
+                 if (BXXX.GT.500.) BXXX=999.
+                 deltak=100.*(1.-BXXX/totadu)
+               write(1914,*) ns,alat,alon,BXXX,totadu,deltak,sza,vza,amf
+                 
+               do 1941 nv=1,21
+          
+                  
+             toa(nv)=toa(nv)*exp(amf*tozon(nv)*AKOEF)
+
+                  
+1941        continue
          
-                  if(toa(21).lt.0.3) go to 8797
+
+
+            
+c the case of ice and open water - no retrieval
+             if(toa(21).lt.ALR21) iice=1         
+             if(toa(21).lt.ALR21) go to 8797
+             
 c     transfer of OLCI relative azimuthal angle to the definition used in
 c     radiative transfer code                    
                     raa=180.-(vaa-saa)
@@ -237,8 +304,8 @@ c                  effective absorption length(mm)
 c                  effective grain size(mm):diameter
                     D=al/16.36
                     
-                    if (d.lt.0.1) icloud=1
-                    if (d.lt.0.1) go to 8797
+                    if (d.lt.ALDI) icloud=1
+                    if (d.lt.ALDI) go to 8797
 c                  snow specific area ( dimension: m*m/kg)
                     densit=0.917
                     area=   6./D/densit
@@ -1106,7 +1173,7 @@ c    *'root must be bracketed for zbrent'
         endif
         fb=func(b)
 11    continue
-      pause 'zbrent exceeding maximum iterations'
+c      pause 'zbrent exceeding maximum iterations'
       zbrent=b
       
       return
