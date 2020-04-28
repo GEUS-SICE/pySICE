@@ -1,8 +1,18 @@
            program SICE
       
-c                      VERSION 3.1 or 2.0.2
+c                      VERSION 2.2
       
-c                   AUGUST 30, 2019
+c     SEPTEMBER 26, 2019
+      
+c*************************************************************************
+c     In this version the results for spectral albedo retrieval at 900 and 940nm
+c     (bands of water absorption) for low surface albedo cases
+c     are improved using linear interpolation in the range 885-1020nm
+
+C       In addition, refractive index of ice is used via Data INSIDE THE CODE.
+c*************************************************************************
+
+      
       
 c     This code retrieves snow/ice  albedo
 c               and related snow products
@@ -43,7 +53,8 @@ c                    concentration and type/properties  of pollutants in snow, e
       
            real           answer(21),   tozon(21), voda(21),
      c                      w(21),            toa(21),
-     c                      refl(21),rp(21),bai(21),xa(168),ya(168)
+     c     refl(21),rp(21),bai(21),xa(168),ya(168)
+     
                integer ndate(6) 
                 external fun,sobthv,psi,funp,funs
                 
@@ -52,6 +63,351 @@ c                    concentration and type/properties  of pollutants in snow, e
                 common /quatro/x0,x1,x2,y0,y1,y2,ak1
                 
                 common /qua/ xa,ya,am1,AL,NSOLO
+                
+c                 ICE REFRACTIVE INDEX
+
+       data xa /2.010E-001,
+     c2.019E-001,
+     c2.100E-001,
+     c2.500E-001,
+     c3.00E-001,
+     c3.500E-001,
+     c3.900E-001,
+     c4.000E-001,
+     c4.100E-001,
+     c4.200E-001,
+     c4.300E-001,
+     c4.400E-001,
+     c4.500E-001,
+     c4.600E-001,
+     c4.700E-001,
+     c4.800E-001,
+     c4.900E-001,
+     c5.000E-001,
+     c5.100E-001,
+     c5.200E-001,
+     c5.300E-001,
+     c5.400E-001,
+     c5.500E-001,
+     c5.600E-001,
+     c5.700E-001,
+     c5.800E-001,
+     c5.900E-001,
+     c6.000E-001,
+     c6.100E-001,
+     c6.200E-001,
+     c6.300E-001,
+     c6.400E-001,
+     c6.500E-001,
+     c6.600E-001,
+     c6.700E-001,
+     c6.800E-001,
+     c6.900E-001,
+     c7.000E-001,
+     c7.100E-001,
+     c7.200E-001,
+     c7.300E-001,
+     c7.400E-001,
+     c7.500E-001,
+     c7.600E-001,
+     c7.700E-001,
+     c7.800E-001,
+     c7.900E-001,
+     c8.000E-001,
+     c8.100E-001,
+     c8.200E-001,
+     c8.300E-001,
+     c8.400E-001,
+     c8.500E-001,
+     c8.600E-001,
+     c8.700E-001,
+     c8.800E-001,
+     c8.900E-001,
+     c9.000E-001,
+     c9.100E-001,
+     c9.200E-001,
+     c9.300E-001,
+     c9.400E-001,
+     c9.500E-001,
+     c9.600E-001,
+     c9.700E-001,
+     c9.800E-001,
+     c9.900E-001,
+     c1.000E+000,
+     c1.010E+000,
+     c1.020E+000,
+     c1.030E+000,
+     c1.040E+000,
+     c1.050E+000,
+     c1.060E+000,
+     c1.070E+000,
+     c1.080E+000,
+     c1.090E+000,
+     c1.100E+000,
+     c1.110E+000,
+     c1.120E+000,
+     c1.130E+000,
+     c1.140E+000,
+     c1.150E+000,
+     c1.160E+000,
+     c1.170E+000,
+     c1.180E+000,
+     c1.190E+000,
+     c1.200E+000,
+     c1.210E+000,
+     c1.220E+000,
+     c1.230E+000,
+     c1.240E+000,
+     c1.250E+000,
+     c1.260E+000,
+     c1.270E+000,
+     c1.280E+000,
+     c1.290E+000,
+     c1.300E+000,
+     c1.310E+000,
+     c1.320E+000,
+     c1.330E+000,
+     c1.340E+000,
+     c1.350E+000,
+     c1.360E+000,
+     c1.370E+000,
+     c1.380E+000,
+     c1.390E+000,
+     c1.400E+000,
+     c1.410E+000,
+     c1.420E+000,
+     c1.430E+000,
+     c1.440E+000,
+     c1.449E+000,
+     c1.460E+000,
+     c1.471E+000,
+     c1.481E+000,
+     c1.493E+000,
+     c1.504E+000,
+     c1.515E+000,
+     c1.527E+000,
+     c1.538E+000,
+     c1.563E+000,
+     c1.587E+000,
+     c1.613E+000,
+     c1.650E+000,
+     c1.680E+000,
+     c1.700E+000,
+     c1.730E+000,
+     c1.760E+000,
+     c1.800E+000,
+     c1.830E+000,
+     c1.840E+000,
+     c1.850E+000,
+     c1.855E+000,
+     c1.860E+000,
+     c1.870E+000,
+     c1.890E+000,
+     c1.905E+000,
+     c1.923E+000,
+     c1.942E+000,
+     c1.961E+000,
+     c1.980E+000,
+     c2.000E+000,
+     c2.020E+000,
+     c2.041E+000,
+     c2.062E+000,
+     c2.083E+000,
+     c2.105E+000,
+     c2.130E+000,
+     c2.150E+000,
+     c2.170E+000,
+     c2.190E+000,
+     c2.220E+000,
+     c2.240E+000,
+     c2.245E+000,
+     c2.250E+000,
+     c2.260E+000,
+     c2.270E+000,
+     c2.290E+000,
+     c2.310E+000,
+     c2.330E+000,
+     c2.350E+000,
+     c2.370E+000,
+     c2.390E+000,
+     c2.410E+000,
+     c2.430E+000,
+     c2.460E+000,
+     c2.500E+000/
+
+
+          data ya/
+     c         3.249E-011,
+     c                    2.0E-011,
+     c                     2.0E-011,
+     c                         2.0E-011,
+     c                              2.0E-011,
+     c                              2.0E-011,
+     c                                2.0E-011,
+     c                          2.365E-011,
+     c                             2.669E-011,
+     c                            3.135E-011,
+     c                                4.140E-011,
+     c                                 6.268E-011,
+     c                           9.239E-011,
+     c                                    1.325E-010,
+     c                                  1.956E-010,
+     c                            2.861E-010,
+     c                             4.172E-010,
+     c                               5.889E-010,
+     c                          8.036E-010,
+     c                            1.076E-009,
+     c                             1.409E-009,
+     c                         1.813E-009,
+     c                           2.289E-009,
+     c                       2.839E-009,
+     c                         3.461E-009,
+     c                           4.159E-009,
+     c                             4.930E-009,
+     c                          5.730E-009,
+     c                6.890E-009,
+     c                     8.580E-009,
+     c                      1.040E-008,
+     c                          1.220E-008,
+     c                        1.430E-008,
+     c                  1.660E-008,                              
+     c1.890E-008,
+     c2.090E-008,
+     c2.400E-008,
+     c2.900E-008,
+     c3.440E-008,
+     c4.030E-008,
+     c4.300E-008,
+     c4.920E-008,
+     c5.870E-008,
+     c7.080E-008,
+     c8.580E-008,
+     c1.020E-007,
+     c1.180E-007,
+     c1.340E-007,
+     c1.400E-007,
+     c1.430E-007,
+     c1.450E-007,
+     c1.510E-007,
+     c1.830E-007,
+     c2.150E-007,
+     c2.650E-007,
+     c3.350E-007,
+     c3.920E-007,
+     c4.200E-007,
+     c 4.440E-007,
+     c4.740E-007,
+     c5.110E-007,
+     c5.530E-007,
+     c6.020E-007,
+     c7.550E-007,
+     c9.260E-007,
+     c1.120E-006,
+     c1.330E-006,
+     c1.620E-006,
+     c2.000E-006,
+     c2.250E-006,
+     c2.330E-006,
+     c2.330E-006,
+     c2.170E-006,
+     c1.960E-006,
+     c1.810E-006,
+     c1.740E-006,
+     c1.730E-006,
+     c1.700E-006,
+     c1.760E-006,
+     c1.820E-006,
+     c2.040E-006,
+     c2.250E-006,
+     c2.290E-006,
+     c3.040E-006,
+     c3.840E-006,
+     c4.770E-006,
+     c5.760E-006,
+     c6.710E-006,
+     c8.660E-006,
+     c1.020E-005,
+     c1.130E-005,
+     c1.220E-005,
+     c1.290E-005,
+     c1.320E-005,
+     c1.350E-005,
+     c1.330E-005,
+     c1.320E-005,
+     c1.320E-005,
+     c1.310E-005,
+     c1.320E-005,
+     c1.320E-005,
+     c1.340E-005,
+     c1.390E-005,
+     c1.420E-005,
+     c1.480E-005,
+     c1.580E-005,
+     c1.740E-005,
+     c1.980E-005,
+     c3.442E-005,
+     c5.959E-005,
+     c1.028E-004,
+     c1.516E-004,
+     c2.030E-004,
+     c2.942E-004,
+     c3.987E-004,
+     c4.941E-004,
+     c5.532E-004,
+     c5.373E-004,
+     c5.143E-004,
+     c4.908E-004,
+     c4.594E-004,
+     c3.858E-004,
+     c3.105E-004,
+     c2.659E-004,
+     c2.361E-004,
+     c2.046E-004,
+     c1.875E-004,
+     c1.650E-004,
+     c1.522E-004,
+     c1.411E-004,
+     c1.302E-004,
+     c1.310E-004,
+     c1.339E-004,
+     c1.377E-004,
+     c1.432E-004,
+     c1.632E-004,
+     c2.566E-004,
+     c4.081E-004,
+     c7.060E-004,
+     c1.108E-003,
+     c1.442E-003,
+     c1.614E-003,
+     c1.640E-003,
+     c1.566E-003,
+     c1.458E-003,
+     c1.267E-003,
+     c1.023E-003,
+     c7.586E-004,
+     c5.255E-004,
+     c4.025E-004,
+     c3.235E-004,
+     c2.707E-004,
+     c2.228E-004,
+     c2.037E-004,
+     c2.026E-004,
+     c2.035E-004,
+     c2.078E-004,
+     c2.171E-004,
+     c2.538E-004,
+     c3.138E-004,
+     c3.858E-004,
+     c4.591E-004,
+     c5.187E-004,
+     c 5.605E-004,
+     c5.956E-004,
+     c6.259E-004,
+     c6.820E-004,
+     c7.530E-004/
+
+
+                
                 
 c             OLCI channels
                 
@@ -83,7 +439,7 @@ c             OLCI channels
 c     Imaginary part of ice refractive index at OLCI channels
          
                      DATA bai/         
-     c                  2.365E-11,      
+     c                  2.365E-11,     
      c                  2.7E-11,     
      c                  7.0E-11,      
      c                  4.17E-10,      
@@ -139,9 +495,9 @@ c      and for the TOA reflectance at 1020nm
                             read(1984,*) ALR21,ALDI
                             
 c     imaginary part of ice refractive index
-                     open(5000,file='ice_index.dat')
-                     open(2099,file='interm.dat')
-                     open(1212, file='interm_alb.dat')
+c                     open(5000,file='ice_index.dat')
+c                     open(2099,file='interm.dat')
+c                     open(1212, file='interm_alb.dat')
                      
 c***************************************************************************
 c                  Alex 09.06.2019
@@ -184,9 +540,11 @@ c                pre-assumed number: AOT-aerosol optical thickness  at 500nm
                  read(102,*) AOT
 
 c                reading ice refractive index
-                  do 8867 jg=1,168  
-             read(5000,*) xa(jg),an,ya(jg)
- 8867     continue
+c                 do 8867 jg=1,168
+c                    xa(jg)=wd1(jg)
+c                    ya(jg)=wd2(jg)
+c             read(5000,*) xa(jg),an,ya(jg)
+c 8867     continue
 
 
           icloud=0
@@ -340,7 +698,7 @@ c                    thv=0.0
                     THV=SOBTHV(AOT)
                  
                            isnow=1
-                        write(2099,*) ndate(3),toa(1),thv
+c                        write(2099,*) ndate(3),toa(1),thv
                        if ( toa(1).lt.THV) go to 1961
 c**********************************************************
  9393                       continue
@@ -524,13 +882,14 @@ c      comment:       in the range >865nm the physical interpolation is used
                answer(15)=bfirn+afirn*0.767
 
                
-c                 first channels:              
+c     first channels:
+               
                  do 1989 m=1,17
                  
                        rp(m)=answer(m)**ak1
                        refl(m)=r0*answer(m)**xxx
                        
- 1989               continue
+ 1989         continue
 
                     
                 if (toa(21).lt.0.5) go to 19644
@@ -547,9 +906,30 @@ c     derivation of snow reflectance function
 
 
                     
-19644           continue
-                 do 1891 m=18,21                                
+19644               continue
+                    
+c     ***********CORRECTION FOR VERSION 2.2*********************
+                    
+c                              ALEX
+c                    SEPTEMBER 26, 2019
+c     to avoid the influence of gaseous absorption (water vapor)
+c     we lienarlz interpolate in the range 885-1020nm
+c        for bare ice cases only(low albedo)
                   
+                        
+                        delx=w(21)-w(18)
+                        bcoef=(answer(21)-answer(18))/delx
+                        acoef=answer(21)-bcoef*w(21)
+
+                        answer(19)=acoef+bcoef*w(19)
+                        answer(20)=acoef+bcoef*w(20)
+c************************END of MODIFICATION**************                        
+                   do 1891 m=18,21                                
+c                              ALEX
+c                    SEPTEMBER 26, 2019
+c     to avoid the influence of gaseous absorption (water vapor)
+c      we interpolate in the range 865-1020nm
+                    
 c     derivation of plane albedo                  
                        rp(m)=answer(m)**ak1
 c     derivation of snow reflectance function                      
