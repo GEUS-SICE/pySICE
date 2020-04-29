@@ -21,6 +21,7 @@ InputFolder = 'out/SICE_2020_py1.4/'
 ipython.magic('run sice.py '+InputFolder)
 
 #% Plotting output
+ipython.magic("matplotlib inline")
 
 try:
     os.mkdir(InputFolder+'plots')
@@ -32,14 +33,25 @@ fig,ax=bl.heatmap_discrete(rio.open(InputFolder+'diagnostic_retrieval.tif').read
 ax.set_title(InputFolder)
 fig.savefig(InputFolder+'plots/diagnostic_retrieval.png',bbox_inches='tight')
 
-var_list = ('albedo_bb_planar_sw','albedo_bb_spherical_sw')
+var_list = ('albedo_bb_planar_sw','albedo_bb_spherical_sw','r0')
 for i in range(len(var_list)):
     var_1 = rio.open(InputFolder+var_list[i]+'.tif').read(1)
     plt.figure(figsize=(10,15))
     bl.heatmap(var_1,var_list[i], col_lim=(0, 1) ,cmap_in='jet')
     plt.title(InputFolder)
-    plt.savefig(InputFolder+'plots/'+var_list[i]+'_diff.png',bbox_inches='tight')
-plt.ioff()  
+    plt.savefig(InputFolder+'plots/'+var_list[i]+'.png',bbox_inches='tight')
+    plt.close()
+    
+var_list = ('O3_SICE', 'grain_diameter', 'snow_specific_area',
+            'al','conc')
+for i in range(len(var_list)):
+    var_1 = rio.open(InputFolder+var_list[i]+'.tif').read(1)
+    plt.figure(figsize=(10,15))
+    bl.heatmap(var_1,var_list[i],cmap_in='jet')
+    plt.title(InputFolder)
+    plt.savefig(InputFolder+'plots/'+var_list[i]+'.png',bbox_inches='tight')
+    plt.close()
+
 for i in np.arange(21):
     var_name = 'albedo_spectral_spherical_'+ str(i+1).zfill(2)
     var_1 = rio.open(InputFolder+var_name+'.tif').read(1)
@@ -47,8 +59,22 @@ for i in np.arange(21):
     bl.heatmap(var_1,var_name, col_lim=(0, 1) ,cmap_in='jet')
     plt.title(InputFolder)
     plt.savefig(InputFolder+'plots/'+var_name+'.png',bbox_inches='tight')
-plt.ion()
-
+    plt.close()
+    var_name = 'albedo_spectral_planar_'+ str(i+1).zfill(2)
+    var_1 = rio.open(InputFolder+var_name+'.tif').read(1)
+    plt.figure(figsize=(10,15))
+    bl.heatmap(var_1,var_name, col_lim=(0, 1) ,cmap_in='jet')
+    plt.title(InputFolder)
+    plt.savefig(InputFolder+'plots/'+var_name+'.png',bbox_inches='tight')
+    plt.close()
+    var_name = 'rBRR_'+ str(i+1).zfill(2)
+    var_1 = rio.open(InputFolder+var_name+'.tif').read(1)
+    plt.figure(figsize=(10,15))
+    bl.heatmap(var_1,var_name, col_lim=(0, 1) ,cmap_in='jet')
+    plt.title(InputFolder)
+    plt.savefig(InputFolder+'plots/'+var_name+'.png',bbox_inches='tight')
+    plt.close()
+ipython.magic("matplotlib qt")
 #%% ========== Compare two folders ==================
 
 plt.close('all')
