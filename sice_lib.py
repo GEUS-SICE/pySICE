@@ -28,10 +28,11 @@ Update 07032019
 # from FORTRAN VERSION 5
 # March 31, 2020
 #
-# Latest update of python script: 20-04-2020 (bav@geus.dk)
-# From Baptiste:
-#- reorganized sice_lib.py
-#- prevented code to crash when no pixels are suitable for retrieval
+# Latest update of python scripts: 29-04-2020 (bav@geus.dk)
+# - Fixed a bug in the indexing of the polluted pixels for which the spherical albedo equation could not be solved.  Solved the oultiers visible in bands 12-15 and 19-20 and  expended the BBA calculation to few pixels that fell out of the index.
+# -compression of output
+# - new backscatter fraction from Alex
+# - new format for tg_vod.dat file
 
 # **************************************************
 # Inputs:

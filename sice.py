@@ -3,7 +3,7 @@
 # from FORTRAN VERSION 5.2
 # March 31, 2020
 #
-# Latest update of python scripts: 20-04-2020 (bav@geus.dk)
+# Latest update of python scripts: 29-04-2020 (bav@geus.dk)
 # From Baptiste:
 #- reorganized sice_lib.py
 #- prevented code to crash when no pixels are suitable for retrieval
