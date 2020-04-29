@@ -288,7 +288,7 @@ if np.any(ind_pol):
 rp = np.power (alb_sph, ak1)
 refl =r0* np.power(alb_sph, (ak1*ak2/r0))
 
-ind_all_clean = np.logical_or(isnow == 0, isnow == 7)
+ind_all_clean = np.logical_or(ind_clean, isnow == 7)
 
 ## CalCULATION OF BBA of clean snow
 
@@ -315,12 +315,10 @@ rp3[ind_all_clean]=sl.plane_albedo_sw_approx(D[ind_all_clean],am1[ind_all_clean]
 rs3[ind_all_clean]= sl.spher_albedo_sw_approx(D[ind_all_clean])
     
 # calculation of the BBA for the polluted snow
-ind_all_polluted =  np.logical_or(isnow == 1,  isnow == 6)
-
-rp1[ind_all_polluted], rp2[ind_all_polluted], rp3[ind_all_polluted] = sl.BBA_calc_pol(
-        rp[:, ind_all_polluted], asol, sol1_pol, sol2, sol3_pol)
-rs1[ind_all_polluted], rs2[ind_all_polluted], rs3[ind_all_polluted] = sl.BBA_calc_pol(
-        alb_sph[:, ind_all_polluted], asol, sol1_pol, sol2, sol3_pol)
+rp1[ind_pol], rp2[ind_pol], rp3[ind_pol] = sl.BBA_calc_pol(
+        rp[:, ind_pol], asol, sol1_pol, sol2, sol3_pol)
+rs1[ind_pol], rs2[ind_pol], rs3[ind_pol] = sl.BBA_calc_pol(
+        alb_sph[:, ind_pol], asol, sol1_pol, sol2, sol3_pol)
                
 #%% Output
 WriteOutput(BXXX,   'O3_SICE',   InputFolder)
