@@ -39,23 +39,24 @@ fi
 DEST=${INPATH}
 
 timing
+
 # input for sice
 # ns,alat,alon,sza,vza,saa,vaa,height,(toa(iks),iks=1,21), ozone, water
 # The number of lines in this file MUST be equal to the number of lines in the file 'nlines.dat'
-wc -l < ${DEST}/olci_toa.dat > ${DEST}/nlines.dat
+wc -l < ${DEST}/olci_toa_newformat.dat > ${DEST}/nlines.dat
 
 # moving files to processor folder
-cp ${DEST}/olci_toa.dat ./SnowProcessor/olci_toa.dat
-cp ${DEST}/nlines.dat ./SnowProcessor/nlines.dat
+cp ${DEST}/olci_toa_newformat.dat ./Fortran/olci_toa_newformat.dat
+cp ${DEST}/nlines.dat ./Fortran/nlines.dat
 
 end=`date +%s`
 echo Execution time was `expr $end - $start` seconds.
 start=`date +%s`
 # ===========  Running FORTRAN SICE ======================
 MSG_OK "Running sice.exe"
-# gfortran ./SnowProcessor/sice.f -o ./SnowProcessor/sice.exe
+# gfortran ./Fortran/sice.f -o ./Fortran/sice.exe
 
-cd ./SnowProcessor
+cd ./Fortran
 ./sice.exe
 end=`date +%s`
 echo Execution time was `expr $end - $start` seconds.
@@ -64,26 +65,26 @@ start=`date +%s`
 # =========== copying back to home folder =========================
 
 cd ..
-cp ./SnowProcessor/bba_alex_reduced.dat		${DEST}/bba_alex_reduced.dat
-cp ./SnowProcessor/bba.dat					${DEST}/bba.dat
-cp ./SnowProcessor/boar.dat					${DEST}/boar.dat
-cp ./SnowProcessor/planar_albedo.dat		${DEST}/planar_albedo.dat
-cp ./SnowProcessor/spherical_albedo.dat		${DEST}/spherical_albedo.dat
-cp ./SnowProcessor/impurity.dat				${DEST}/impurity.dat
-cp ./SnowProcessor/nlines.dat				${DEST}/nlines.dat
-cp ./SnowProcessor/notsnow.dat				${DEST}/notsnow.dat
-cp ./SnowProcessor/size.dat					${DEST}/size.dat
-cp ./SnowProcessor/retrieved_O3.dat 		${DEST}/retrieved_O3.dat
+cp ./Fortran/bba_alex_reduced.dat		${DEST}/bba_alex_reduced.dat
+cp ./Fortran/bba.dat					${DEST}/bba.dat
+cp ./Fortran/boar.dat					${DEST}/boar.dat
+cp ./Fortran/planar_albedo.dat		${DEST}/planar_albedo.dat
+cp ./Fortran/spherical_albedo.dat		${DEST}/spherical_albedo.dat
+cp ./Fortran/impurity.dat				${DEST}/impurity.dat
+cp ./Fortran/nlines.dat				${DEST}/nlines.dat
+cp ./Fortran/notsnow.dat				${DEST}/notsnow.dat
+cp ./Fortran/size.dat					${DEST}/size.dat
+cp ./Fortran/retrieved_O3.dat 		${DEST}/retrieved_O3.dat
 
-rm ./SnowProcessor/{bba_alex_reduced,bba,boar}.dat 
-rm ./SnowProcessor/planar_albedo.dat
-rm ./SnowProcessor/spherical_albedo.dat 
-rm ./SnowProcessor/impurity.dat
-rm ./SnowProcessor/nlines.dat 
-rm ./SnowProcessor/olci_toa.dat 
-rm ./SnowProcessor/notsnow.dat
-rm ./SnowProcessor/size.dat
-rm ./SnowProcessor/retrieved_O3.dat
+rm ./Fortran/{bba_alex_reduced,bba,boar}.dat 
+rm ./Fortran/planar_albedo.dat
+rm ./Fortran/spherical_albedo.dat 
+rm ./Fortran/impurity.dat
+rm ./Fortran/nlines.dat 
+rm ./Fortran/olci_toa_newformat.dat 
+rm ./Fortran/notsnow.dat
+rm ./Fortran/size.dat
+rm ./Fortran/retrieved_O3.dat
 
 
 timing

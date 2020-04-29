@@ -1,6 +1,6 @@
-# pySICEv1.3
+# pySICEv1.4
 # 
-# from FORTRAN VERSION 5
+# from FORTRAN VERSION 5.2
 # March 31, 2020
 #
 # Latest update of python scripts: 20-04-2020 (bav@geus.dk)
@@ -8,22 +8,6 @@
 #- reorganized sice_lib.py
 #- prevented code to crash when no pixels are suitable for retrieval
 # 
-# BAV 10-10-2019 (bav@geus.dk)
-# Changes:
-#   old variable:           Replaced by:
-#   raa                     its formula: 180.-(vaa-saa)
-#   AKOEF                   its formula: totadu/404.59
-#   nv np and isk           i_channel
-#   xxx                     ak1*ak2/r0
-#   answer                  alb_sph
-#   nsolo                   spher_calc
-#   fun                     alb2rtoa
-#   deltak                  removed (diagnostic variable)
-#   sobthv                  specific case o alb2rtoa
-#   funs                    removed (not used)
-#   zbrent                  replaced by a python version
-#   psi                     specific case of sol
-#   wave                    removed (using vectorized w instead)
               
 # This code retrieves snow/ice  albedo and related snow products for clean Arctic
 # atmosphere. The errors increase with the load of pollutants in air.
@@ -103,14 +87,17 @@ np.seterr(invalid='ignore')
 start_time = time.process_time()
 
 # InputFolder =  sys.argv[1] + '/'
-
+InputFolder = 'out/SICE_2020_py1.4/'
 #%% ========= input tif ================
 Oa01 = rio.open(InputFolder+'r_TOA_01.tif')
 meta = Oa01.meta
+with rio.Env():    
+    meta.update(compress='DEFLATE')
 
 def WriteOutput(var,var_name,in_folder):
     # this functions write tif files based on a model file, here "Oa01"
     # opens a file for writing
+
     with rio.open(in_folder+var_name+'.tif', 'w+', **meta) as dst:
         dst.write(var.astype('float32'),1)
     
@@ -136,7 +123,7 @@ vaa[np.isnan(toa[0,:,:])] = np.nan
 water_vod = genfromtxt('./tg_water_vod.dat', delimiter='   ')
 voda = water_vod[range(21),1]
 
-ozone_vod = genfromtxt('./tg_vod.dat', delimiter='   ',skip_header=2)
+ozone_vod = genfromtxt('./tg_vod.dat', delimiter='   ')
 tozon = ozone_vod[range(21),1]
 aot = 0.1
 
@@ -343,14 +330,10 @@ WriteOutput(al,   'al',     InputFolder)
 WriteOutput(r0,   'r0',InputFolder)
 WriteOutput(isnow,'diagnostic_retrieval',InputFolder)
 WriteOutput(conc, 'conc',InputFolder)
-#WriteOutput(rp1,  'albedo_bb_planar_vis',InputFolder)
-#WriteOutput(rp2,  'albedo_bb_planar_nir',InputFolder)
 WriteOutput(rp3,  'albedo_bb_planar_sw',InputFolder)
-#WriteOutput(rs1,  'albedo_bb_spherical_vis',InputFolder)
-#WriteOutput(rs2,  'albedo_bb_spherical_nir',InputFolder)
 WriteOutput(rs3,  'albedo_bb_spherical_sw',InputFolder)
 
-for i in range(21): 
+for i in np.append(np.arange(11), np.arange(15,21)):
     WriteOutput(alb_sph[i,:,:],    'albedo_spectral_spherical_'+str(i+1).zfill(2), InputFolder)
     WriteOutput(rp[i,:,:],    'albedo_spectral_planar_'+str(i+1).zfill(2), InputFolder)
     WriteOutput(refl[i,:,:],   'rBRR_'+str(i+1).zfill(2), InputFolder)

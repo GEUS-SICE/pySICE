@@ -13,17 +13,13 @@ You will need to update
 """
 
 import numpy as np
-from numpy import genfromtxt
-import sice_lib as sl
 import rasterio as rio
 import time
-#import bav_lib as bl
-import sys
 import os
 
 start_time = time.time()
 #InputFolder = sys.argv[1] + '/'
-InputFolder = 'out/SICE_2020_py/'
+InputFolder = 'out/SICE_2020_py1.4/'
 
 #%% turning geotiffs into sice input
 print("Reading input ")
@@ -79,21 +75,21 @@ olci_toa = olci_toa[ind_good_pixels,:]
 olci_toa[np.isnan(olci_toa)] = 999
 OutputFolder= InputFolder+'fortran/'
 #os.mkdir(OutputFolder)
-np.savetxt(OutputFolder+'olci_toa.dat', X=olci_toa, delimiter='\t', \
+np.savetxt(OutputFolder+'olci_toa_newformat.dat', X=olci_toa, delimiter='\t', \
            fmt='%i '+ '%10.5f '*6 + '%i '+ '%10.5f'*23)
 
-
 #%%  You can now run sice.f
-
-print('bash sice_f.sh -i '+OutputFolder)
-os.system('bash sice_f.sh -i '+OutputFolder)
+print('bash ./sice_f.sh -i '+OutputFolder)
+ os.getcwd()
+os.system('bash ./sice_f.sh -i '+OutputFolder)
 
 
 #%% Loading result from sice_debug.f
 import rasterio as rio
 Oa01 = rio.open(InputFolder+'r_TOA_01.tif')
 meta = Oa01.meta
-
+with rio.Env():    
+    meta.update(compress='DEFLATE')
 def output_sice_f(file_name,var_name,var_id):
     sice_out = np.loadtxt(file_name)
     ind_orig = np.arange(1,len(Oa01.read(1).flatten())+1)
@@ -106,30 +102,26 @@ def output_sice_f(file_name,var_name,var_id):
         dst.write(var_mat.astype('float32'),1)
     
 output_sice_f(OutputFolder+"bba.dat",'rp3',4)
-output_sice_f(OutputFolder+"bba.dat",'rp1',5)
-output_sice_f(OutputFolder+"bba.dat",'rp2',6)
-output_sice_f(OutputFolder+"bba.dat",'rs3',7)
-output_sice_f(OutputFolder+"bba.dat",'rs1',8)
-output_sice_f(OutputFolder+"bba.dat",'rs2',9)
+output_sice_f(OutputFolder+"bba.dat",'rs3',5)
 output_sice_f(OutputFolder+"size.dat",'D',4)
 output_sice_f(OutputFolder+"size.dat",'area',5)
 output_sice_f(OutputFolder+"size.dat",'al',6)
 output_sice_f(OutputFolder+"size.dat",'r0',7)
 output_sice_f(OutputFolder+"bba_alex_reduced.dat",'isnow',3)
-#output_sice_f(OutputFolder+"retrieved_O3.dat",'amf',8)
+
 for i in range(21):
     output_sice_f(OutputFolder+"spherical_albedo.dat",'alb_sph_'+str(i+1),4+i)
     output_sice_f(OutputFolder+"planar_albedo.dat",'rp_'+str(i+1),4+i)
     output_sice_f(OutputFolder+"boar.dat",'r_boa_'+str(i+1),4+i)
 
-
-# 'spherical_albedo.dat'    ns,ndate(3),alat,alon,(answer(i),i=1,21),isnow
-#  'planar_albedo.dat'      ns,ndate(3),alat,alon,(rp(i),i=1,21),isnow
-# 'boar.dat'                ns,ndate(3),alat,alon,(refl(i),i=1,21),isnow
-#   'size.dat'              ns,ndate(3),alat,alon,D,area,al,r0, andsi,andbi,indexs,indexi,indexd,isnow
-#  'impurity.dat'           ns,ndate(3),alat,alon,ntype,conc,bf,bm,thv, toa(1),isnow
-#   'bba.dat'               ns,ndate(3),alat,alon,rp3,rp1,rp2,rs3,rs1, rs2,isnow
-#  'bba_alex_reduced.dat'   ns,ndate(3),rp3,isnow      
-#   retrieved_O3.dat        ns,alat,alon,BXXX,totadu,deltak,sza,vza,amf
-
-#    
+# OUTPUT files:
+#  file= 'spherical_albedo.dat' )           ns,ndate(3),alat,alon,(answer(i),i=1,21),isnow
+#  file= 'planar_albedo.dat'     )          ns,ndate(3),alat,alon,(rp(i),i=1,21),isnow
+#  file= 'boar.dat'                    )    ns,ndate(3),alat,alon,(refl(i),i=1,21),isnow
+#  file= 'size.dat'                     )   ns,ndate(3),alat,alon,D,area,al,r0, andsi,andbi,indexs,indexi,indexd,isnow
+#  file=   'impurity.dat'              )    ns,ndate(3),alat,alon,ntype,conc,bf,bm,thv, toa(1),isnow
+#  file=   'bba.dat'                     )  ns,ndate(3),alat,alon,rp3,rs3, isnow
+#  file=   'bba_alex_reduced.dat')          ns,ndate(3),rp3,isnow   
+#  file=   'notsnow.dat')                   ns,ndate(3),icloud,iice
+#  file='retrieved_O3.dat')                 ns,alat,alon,BXXX,totadu,deltak,sza,vza,amf
+    
