@@ -46,17 +46,17 @@ timing
 wc -l < ${DEST}/olci_toa_newformat.dat > ${DEST}/nlines.dat
 
 # moving files to processor folder
-cp ${DEST}/olci_toa_newformat.dat ./Fortran/olci_toa_newformat.dat
-cp ${DEST}/nlines.dat ./Fortran/nlines.dat
+cp ${DEST}/olci_toa_newformat.dat ./fortran/olci_toa_newformat.dat
+cp ${DEST}/nlines.dat ./fortran/nlines.dat
 
 end=`date +%s`
 echo Execution time was `expr $end - $start` seconds.
 start=`date +%s`
-# ===========  Running FORTRAN SICE ======================
+# ===========  Running fortran SICE ======================
 MSG_OK "Running sice.exe"
-# gfortran ./Fortran/sice.f -o ./Fortran/sice.exe
+#gfortran ./fortran/sice.f -o ./fortran/sice.exe
 
-cd ./Fortran
+cd ./fortran
 ./sice.exe
 end=`date +%s`
 echo Execution time was `expr $end - $start` seconds.
@@ -65,27 +65,26 @@ start=`date +%s`
 # =========== copying back to home folder =========================
 
 cd ..
-cp ./Fortran/bba_alex_reduced.dat		${DEST}/bba_alex_reduced.dat
-cp ./Fortran/bba.dat					${DEST}/bba.dat
-cp ./Fortran/boar.dat					${DEST}/boar.dat
-cp ./Fortran/planar_albedo.dat		${DEST}/planar_albedo.dat
-cp ./Fortran/spherical_albedo.dat		${DEST}/spherical_albedo.dat
-cp ./Fortran/impurity.dat				${DEST}/impurity.dat
-cp ./Fortran/nlines.dat				${DEST}/nlines.dat
-cp ./Fortran/notsnow.dat				${DEST}/notsnow.dat
-cp ./Fortran/size.dat					${DEST}/size.dat
-cp ./Fortran/retrieved_O3.dat 		${DEST}/retrieved_O3.dat
+cp ./fortran/bba_alex_reduced.dat		${DEST}/bba_alex_reduced.dat
+cp ./fortran/bba.dat					${DEST}/bba.dat
+cp ./fortran/boar.dat					${DEST}/boar.dat
+cp ./fortran/planar_albedo.dat		${DEST}/planar_albedo.dat
+cp ./fortran/spherical_albedo.dat		${DEST}/spherical_albedo.dat
+cp ./fortran/impurity.dat				${DEST}/impurity.dat
+cp ./fortran/nlines.dat				${DEST}/nlines.dat
+cp ./fortran/notsnow.dat				${DEST}/notsnow.dat
+cp ./fortran/size.dat					${DEST}/size.dat
+cp ./fortran/retrieved_O3.dat 		${DEST}/retrieved_O3.dat
 
-rm ./Fortran/{bba_alex_reduced,bba,boar}.dat 
-rm ./Fortran/planar_albedo.dat
-rm ./Fortran/spherical_albedo.dat 
-rm ./Fortran/impurity.dat
-rm ./Fortran/nlines.dat 
-rm ./Fortran/olci_toa_newformat.dat 
-rm ./Fortran/notsnow.dat
-rm ./Fortran/size.dat
-rm ./Fortran/retrieved_O3.dat
-
+rm ./fortran/{bba_alex_reduced,bba,boar}.dat 
+rm ./fortran/planar_albedo.dat
+rm ./fortran/spherical_albedo.dat 
+rm ./fortran/impurity.dat
+rm ./fortran/nlines.dat 
+rm ./fortran/olci_toa_newformat.dat 
+rm ./fortran/notsnow.dat
+rm ./fortran/size.dat
+rm ./fortran/retrieved_O3.dat
 
 timing
 MSG_OK "Finished: ${folder}"

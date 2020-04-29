@@ -16,10 +16,16 @@ import numpy as np
 import rasterio as rio
 import time
 import os
+import sys
+import bav_lib as bl
 
 start_time = time.time()
-#InputFolder = sys.argv[1] + '/'
+
+# InputFolder = sys.argv[1] + '/'
 InputFolder = 'out/SICE_2020_py1.4/'
+
+print(os.getcwd())
+
 
 #%% turning geotiffs into sice input
 print("Reading input ")
@@ -79,13 +85,11 @@ np.savetxt(OutputFolder+'olci_toa_newformat.dat', X=olci_toa, delimiter='\t', \
            fmt='%i '+ '%10.5f '*6 + '%i '+ '%10.5f'*23)
 
 #%%  You can now run sice.f
-print('bash ./sice_f.sh -i '+OutputFolder)
- os.getcwd()
-os.system('bash ./sice_f.sh -i '+OutputFolder)
+print('bash ./fortran/sice_f.sh -i '+OutputFolder)
+os.system('bash ./fortran/sice_f.sh -i '+OutputFolder)
 
 
 #%% Loading result from sice_debug.f
-import rasterio as rio
 Oa01 = rio.open(InputFolder+'r_TOA_01.tif')
 meta = Oa01.meta
 with rio.Env():    
@@ -101,18 +105,18 @@ def output_sice_f(file_name,var_name,var_id):
     with rio.open(OutputFolder+var_name+'.tif', 'w+', **meta) as dst: 
         dst.write(var_mat.astype('float32'),1)
     
-output_sice_f(OutputFolder+"bba.dat",'rp3',4)
-output_sice_f(OutputFolder+"bba.dat",'rs3',5)
+output_sice_f(OutputFolder+"bba.dat",'albedo_bb_planar_sw',4)
+output_sice_f(OutputFolder+"bba.dat",'albedo_bb_spherical_sw',5)
 output_sice_f(OutputFolder+"size.dat",'D',4)
 output_sice_f(OutputFolder+"size.dat",'area',5)
 output_sice_f(OutputFolder+"size.dat",'al',6)
 output_sice_f(OutputFolder+"size.dat",'r0',7)
-output_sice_f(OutputFolder+"bba_alex_reduced.dat",'isnow',3)
+output_sice_f(OutputFolder+"bba_alex_reduced.dat",'diagnostic_retrieval',3)
 
 for i in range(21):
-    output_sice_f(OutputFolder+"spherical_albedo.dat",'alb_sph_'+str(i+1),4+i)
-    output_sice_f(OutputFolder+"planar_albedo.dat",'rp_'+str(i+1),4+i)
-    output_sice_f(OutputFolder+"boar.dat",'r_boa_'+str(i+1),4+i)
+    output_sice_f(OutputFolder+"spherical_albedo.dat",'albedo_spectral_spherical_'+str(i+1).zfill(2),4+i)
+    output_sice_f(OutputFolder+"planar_albedo.dat",'albedo_spectral_planar_'+str(i+1).zfill(2),4+i)
+    output_sice_f(OutputFolder+"boar.dat",'rBRR_'+str(i+1),4+i)
 
 # OUTPUT files:
 #  file= 'spherical_albedo.dat' )           ns,ndate(3),alat,alon,(answer(i),i=1,21),isnow
@@ -124,4 +128,33 @@ for i in range(21):
 #  file=   'bba_alex_reduced.dat')          ns,ndate(3),rp3,isnow   
 #  file=   'notsnow.dat')                   ns,ndate(3),icloud,iice
 #  file='retrieved_O3.dat')                 ns,alat,alon,BXXX,totadu,deltak,sza,vza,amf
+
+#%%   plotting oulooks  
+try:
+    os.mkdir(OutputFolder+'plots')
+except:
+    print('folder exist')
     
+import matplotlib.pyplot as plt
+   
+# fig,ax=bl.heatmap_discrete(rio.open(OutputFolder+'diagnostic_retrieval.tif').read(1),
+#                         'diagnostic_retrieval ')
+# ax.set_title(OutputFolder)
+# fig.savefig(OutputFolder+'plots/diagnostic_retrieval.png',bbox_inches='tight')
+
+var_list = ('albedo_bb_planar_sw','albedo_bb_spherical_sw')
+for i in range(len(var_list)):
+    var_1 = rio.open(OutputFolder+var_list[i]+'.tif').read(1)
+    plt.figure(figsize=(10,15))
+    bl.heatmap(var_1,var_list[i], col_lim=(0, 1) ,cmap_in='jet')
+    plt.title(OutputFolder)
+    plt.savefig(OutputFolder+'plots/'+var_list[i]+'_diff.png',bbox_inches='tight')
+plt.ioff()  
+for i in np.append(np.arange(11), np.arange(21)):
+    var_name = 'albedo_spectral_spherical_'+ str(i+1).zfill(2)
+    var_1 = rio.open(OutputFolder+var_name+'.tif').read(1)
+    plt.figure(figsize=(10,15))
+    bl.heatmap(var_1,var_name, col_lim=(0, 1) ,cmap_in='jet')
+    plt.title(OutputFolder)
+    plt.savefig(OutputFolder+'plots/'+var_name+'.png',bbox_inches='tight')
+plt.ion()

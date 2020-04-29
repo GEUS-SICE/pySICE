@@ -81,8 +81,8 @@ def heatmap_discrete(var, title='', col_lim=(np.nan, np.nan) ,cmap_in='gnuplot')
     
     bounds = np.unique(var)[np.logical_not(np.isnan(np.unique(var)))]
     norm = mpl.colors.BoundaryNorm(bounds, cmap.N+1)
-         
-    fig,ax = plt.subplots()
+
+    fig,ax = plt.subplots(figsize=(10,15))
     im = ax.imshow(z+1e-6, cmap=cmap, norm = norm, interpolation='Nearest')
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%" , pad= 0.1)
@@ -95,7 +95,7 @@ def heatmap_discrete(var, title='', col_lim=(np.nan, np.nan) ,cmap_in='gnuplot')
 
     fig.show()
 #    fig.write_image(title+".jpeg")
-    return z
+    return fig,ax
     
     #%% =================================================================
 def tmp(**kwargs):

@@ -849,6 +849,9 @@ c************************************************************************
                        
                  
                        answer(isk)=zbrent(fun,x1,x2,tol)
+					   if (answer(isk).eq.-999)then
+					   isnow=-isk
+					   endif
 c                       steps=r0/ak1/ak2
 c                       otwet=(toa(isk)/r0)**steps
 
@@ -1931,7 +1934,10 @@ c                                  a - snow spherical albedo
       b=x2
       fa=func(a)
       fb=func(b)
-c      if((fa.gt.0..and.fb.gt.0.).or.(fa.lt.0..and.fb.lt.0.))pause
+      if((fa.gt.0..and.fb.gt.0.).or.(fa.lt.0..and.fb.lt.0.))then
+	    zbrent=-999
+		RETURN
+		endif
 c    *'root must be bracketed for zbrent'
       c=b
       fc=fb
