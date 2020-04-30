@@ -52,7 +52,7 @@ for i in range(len(var_list)):
     plt.savefig(InputFolder+'plots/'+var_list[i]+'.png',bbox_inches='tight')
     plt.close()
 
-for i in np.arange(21):
+for i in np.append(np.arange(11), np.arange(15,21)):
     var_name = 'albedo_spectral_spherical_'+ str(i+1).zfill(2)
     var_1 = rio.open(InputFolder+var_name+'.tif').read(1)
     plt.figure(figsize=(10,15))
@@ -103,7 +103,7 @@ for i in range(len(var_list)):
     plt.title(var_list[i])
     plt.savefig('Plots/'+var_list[i]+'_diff.png',bbox_inches='tight')
     
-for i in np.arange(21):
+for i in np.append(np.arange(11), np.arange(15,21)):
     var_name = 'albedo_spectral_planar_'+ str(i+1).zfill(2)
     var_1 = rio.open('out/'+InputFolder_1+var_name+'.tif').read(1)
     var_2 = rio.open('out/'+InputFolder_2+var_name+'.tif').read(1)
@@ -117,3 +117,18 @@ for i in np.arange(21):
 
 # bl.heatmap(rio.open('out/'+InputFolder+'diagnostic_retrieval.tif').read(1),'isnow_py')
 # bl.heatmap(rio.open('out/'+InputFolder_2+'isnow.tif').read(1)-rio.open('out/'+InputFolder_1+'isnow.tif').read(1),'isnow_f-isnow_py')
+
+
+#%% fixing diagnostic plots
+# path = 'C:/Users/bav/OneDrive - Geological survey of Denmark and Greenland/Data/Cook_data/Cook_pySICEv1.4_output'
+# ipython.magic("matplotlib inline")
+
+# import glob
+# path_files = glob.glob(path+'/*/diagnostic_retrieval.tif')
+# for i in range(len(path_files)):
+#     var_1 = rio.open(path_files[i]).read(1)
+
+#     fig,ax = bl.heatmap_discrete(var_1,cmap_in='tab20b')
+#     ax.set_title('diagnostic_retrieval   '+path_files[i][105:len(path_files[i])-25])
+#     plt.savefig(path_files[i][0:len(path_files[i])-25]+'/plots/diagnostic_retrieval.png',bbox_inches='tight')
+#     plt.close()

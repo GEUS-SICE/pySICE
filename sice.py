@@ -331,8 +331,8 @@ WriteOutput(conc, 'conc',InputFolder)
 WriteOutput(rp3,  'albedo_bb_planar_sw',InputFolder)
 WriteOutput(rs3,  'albedo_bb_spherical_sw',InputFolder)
 
-# for i in np.append(np.arange(11), np.arange(15,21)):
-for i in np.arange(21):
+for i in np.append(np.arange(11), np.arange(15,21)):
+# for i in np.arange(21):
     WriteOutput(alb_sph[i,:,:],    'albedo_spectral_spherical_'+str(i+1).zfill(2), InputFolder)
     WriteOutput(rp[i,:,:],    'albedo_spectral_planar_'+str(i+1).zfill(2), InputFolder)
     WriteOutput(refl[i,:,:],   'rBRR_'+str(i+1).zfill(2), InputFolder)

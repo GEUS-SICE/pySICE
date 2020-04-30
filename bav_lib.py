@@ -66,7 +66,7 @@ def heatmap(var, title='', col_lim=(np.nan, np.nan) ,cmap_in='gnuplot'):
 #    fig.write_image(title+".jpeg")
     return z
 #%%
-def heatmap_discrete(var, title='', col_lim=(np.nan, np.nan) ,cmap_in='gnuplot'):
+def heatmap_discrete(var, title='', col_lim=(np.nan, np.nan) ,cmap_in='tab20'):
     if np.isnan(col_lim[0]):
         col_lim=(np.nanmin(var), np.nanmax(var))
     z=var
@@ -80,6 +80,7 @@ def heatmap_discrete(var, title='', col_lim=(np.nan, np.nan) ,cmap_in='gnuplot')
     cmap.set_bad(color='gray')
     
     bounds = np.unique(var)[np.logical_not(np.isnan(np.unique(var)))]
+    bounds = np.append(bounds, bounds[len(bounds)-1]+1)
     norm = mpl.colors.BoundaryNorm(bounds, cmap.N+1)
 
     fig,ax = plt.subplots(figsize=(10,15))
