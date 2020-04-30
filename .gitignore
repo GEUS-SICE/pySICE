@@ -4,6 +4,7 @@ __pycache__/
 out/*
 Plots/*
 Data/*
-validation/*
+
 Fortran/*
 fortran/*
+doc/*
