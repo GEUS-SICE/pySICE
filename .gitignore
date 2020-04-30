@@ -132,3 +132,5 @@ out/*
 Plots/*
 Data/*
 validation/*
+Fortran
+fortran

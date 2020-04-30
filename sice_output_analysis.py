@@ -16,7 +16,7 @@ import os
 plt.close('all')
 
 #%% Running sice
-InputFolder = 'out/SICE_2020_py1.4/'
+InputFolder = 'out/SICE_2020_py1.4.1/'
 
 ipython.magic('run sice.py '+InputFolder)
 
@@ -81,7 +81,7 @@ plt.close('all')
 plt.rcParams.update({'font.size': 18})
 
 InputFolder_1 = 'SICE_2020_py1.4/'
-InputFolder_2 = 'SICE_2020_py1.4/fortran/'
+InputFolder_2 = 'SICE_2020_py1.4.1/'
 
 tmp=bl.heatmap_discrete(rio.open('out/'+InputFolder_1+'diagnostic_retrieval.tif').read(1),
                         'isnow_py '+InputFolder_1)

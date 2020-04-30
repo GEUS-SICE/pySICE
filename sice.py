@@ -196,7 +196,7 @@ ind_pol = toa_cor_o3[0,:,:] < rs_1
 
 isnow[ind_pol] = 1
 
-ind_very_dark = np.logical_and(toa_cor_o3[20]<0.4, ind_pol)
+ind_very_dark = np.logical_and(toa_cor_o3[20,:,:]<0.4, ind_pol)
 isnow[ind_very_dark] = 6
 
 am11=np.sqrt(1.-am1[ind_very_dark]**2.)
@@ -206,10 +206,10 @@ tz=np.arccos(-am1[ind_very_dark] * am2[ind_very_dark] + am11 * am12 * np.cos(raa
              
 pz=11.1*np.exp(-0.087*tz)+1.1*np.exp(-0.014*tz)
 
-rclean = 1.247 + 1.186 *(am1[ind_very_dark]+am2[ind_very_dark]) + \
-5.157 * am1[ind_very_dark] * am2[ind_very_dark] + pz
+rclean = 1.247 + 1.186 *(am1[ind_very_dark]+am2[ind_very_dark]) +  5.157 * am1[ind_very_dark] * am2[ind_very_dark] + pz
 
 rclean = rclean /4. /(am1[ind_very_dark] + am2[ind_very_dark])
+
 r0[ind_very_dark] = rclean
 
 # =========== polluted snow  ====================================
