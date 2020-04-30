@@ -17,7 +17,7 @@ plt.close('all')
 
 #%% Running sice
 InputFolder = 'out/SICE_2020_py1.4.1/'
-
+InputFolder = 'C:/Users/bav/OneDrive - Geological survey of Denmark and Greenland/Data/Cook_data/Cook_pySICEv1.4_output/20170722T141728/'
 ipython.magic('run sice.py '+InputFolder)
 
 #% Plotting output
@@ -28,10 +28,9 @@ try:
 except:
     print('folder exist')
     
-fig,ax=bl.heatmap_discrete(rio.open(InputFolder+'diagnostic_retrieval.tif').read(1),
-                        'diagnostic_retrieval ')
+fig,ax=bl.heatmap_discrete(rio.open(InputFolder+'diagnostic_retrieval.tif').read(1),  'diagnostic_retrieval ')
 ax.set_title(InputFolder)
-fig.savefig(InputFolder+'plots/diagnostic_retrieval.png',bbox_inches='tight')
+fig.savefig(InputFolder+ 'plots/diagnostic_retrieval.png', bbox_inches='tight')
 
 var_list = ('albedo_bb_planar_sw','albedo_bb_spherical_sw','r0')
 for i in range(len(var_list)):
@@ -75,6 +74,12 @@ for i in np.append(np.arange(11), np.arange(15,21)):
     plt.savefig(InputFolder+'plots/'+var_name+'.png',bbox_inches='tight')
     plt.close()
 ipython.magic("matplotlib qt")
+
+bl.heatmap(isnow)
+plt.figure()
+bl.heatmap(toa_cor_o3[20, :,:])
+plt.figure()
+bl.heatmap(toa[20, :,:])
 #%% ========== Compare two folders ==================
 
 plt.close('all')
@@ -120,15 +125,15 @@ for i in np.append(np.arange(11), np.arange(15,21)):
 
 
 #%% fixing diagnostic plots
-# path = 'C:/Users/bav/OneDrive - Geological survey of Denmark and Greenland/Data/Cook_data/Cook_pySICEv1.4_output'
-# ipython.magic("matplotlib inline")
+path = 'C:/Users/bav/OneDrive - Geological survey of Denmark and Greenland/Data/Cook_data/Cook_pySICEv1.4_output'
+ipython.magic("matplotlib inline")
 
-# import glob
-# path_files = glob.glob(path+'/*/diagnostic_retrieval.tif')
-# for i in range(len(path_files)):
-#     var_1 = rio.open(path_files[i]).read(1)
+import glob
+path_files = glob.glob(path+'/*/diagnostic_retrieval.tif')
+for i in range(len(path_files)):
+    var_1 = rio.open(path_files[i]).read(1)
 
-#     fig,ax = bl.heatmap_discrete(var_1,cmap_in='tab20b')
-#     ax.set_title('diagnostic_retrieval   '+path_files[i][105:len(path_files[i])-25])
-#     plt.savefig(path_files[i][0:len(path_files[i])-25]+'/plots/diagnostic_retrieval.png',bbox_inches='tight')
-#     plt.close()
+    fig,ax = bl.heatmap_discrete(var_1,cmap_in='tab20')
+    ax.set_title('diagnostic_retrieval   '+path_files[i][105:len(path_files[i])-25])
+    plt.savefig(path_files[i][0:len(path_files[i])-25]+'/plots/diagnostic_retrieval.png',bbox_inches='tight')
+    plt.close()

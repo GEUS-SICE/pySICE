@@ -48,7 +48,7 @@
 # area                      specific surface area (kg/m/m)
 # al                        effective absorption length(mm)
 # r0                        reflectance of a semi-infinite non-absorbing snow layer
-#
+
 # plane BroadBand Albedo (BBA)
 # rp1                       visible(0.3-0.7micron)
 # rp2                       near-infrared (0.7-2.4micron)
@@ -128,10 +128,7 @@ tozon = ozone_vod[range(21),1]
 aot = 0.1
 
 #%%   declaring variables
-BXXX, isnow, D, area, al, r0, isnow, conc, ntype, rp1, rp2, rp3, rs1, rs2, rs3 =  \
-vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, \
-vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, \
-vaa*np.nan, vaa*np.nan, vaa*np.nan
+BXXX, isnow, D, area, al, r0, isnow, conc, ntype, rp1, rp2, rp3, rs1, rs2, rs3 =   vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan,  vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan
 
 alb_sph, rp, refl =  toa*np.nan, toa*np.nan, toa*np.nan
 
@@ -159,7 +156,7 @@ tau, p, g,gaer,taumol,tauaer = sl.aerosol_properties(aot, height, co)
 D, area, al, r0, bal = sl.snow_properties(toa_cor_o3, ak1, ak2)
 # filtering small D
 D_thresh = 0.1
-isnow[D<D_thresh] = 104
+isnow[np.logical_and(D<D_thresh, np.isnan(isnow))] = 104
 
 for i in range(21):
     toa_cor_o3[i,D<D_thresh] = np.nan
