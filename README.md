@@ -1,2 +1,2 @@
 # pySICE
-Python and Fortran scripts behind the SICE toolchain for albedo retrieval.
+Python scripts behind the SICE toolchain for albedo retrieval.
