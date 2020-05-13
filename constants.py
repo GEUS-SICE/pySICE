@@ -60,7 +60,7 @@ sol3_pol   = sol1_pol  +  sol2
 # asol specific band
 asol = sol(0.865) - sol(0.7)
 
-#%% analystical function and coefficients used in the polluted snow BBA calculation
+#%% analystical integration of the solar flux
 def analyt_func(z1, z2):
     # see BBA_calc_pol
     # compatible with array
@@ -76,5 +76,7 @@ def analyt_func(z1, z2):
     - (z1**2./gam+2.*z1/gam**2 +2./gam**3.)*np.exp(-gam*z1)
                     
     return (f0*ak1  -f1*ak2  -f2*ak3 ), (f0*am1 -f1*am2 -f2*am3)
+
+#%% solar constant
 coef1, coef2 = analyt_func(0.3, 0.7)
 coef3, coef4 = analyt_func(0.7, 0.865)

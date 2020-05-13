@@ -93,32 +93,31 @@ from constants import w, bai, xa, ya, f0, f1, f2, bet, gam, coef1, coef2, coef3,
 # totadu                    ECMWF total column ozone in Dobson Unit
 # toa_cor_03                       ozone-corrected OLCI toa relfectances
     
-def ozone_scattering(ozone,tozon,sza,vza,toa):
+def molecular_absorption(ozone,tozon,sza,vza,toa):
     scale = np.arccos(-1.)/180. # rad per degree
     eps = 1.55
     # ecmwf ozone from OLCI file (in Kg.m-2) to DOBSON UNITS 
     # 1 kg O3 / m2 = 46696.24  DOBSON Unit (DU)
-    totadu = 46729.*ozone
+    totadu = 46696.24 * ozone
                  
-    amf = 1./np.cos(sza*scale)+1./np.cos(vza*scale)
+    inv_cos_za = 1./np.cos(sza*scale)+1./np.cos(vza*scale)
           
     BX=(toa[20]**(1.-eps))  * (toa[16]**eps) / toa[6]
-    BXXX=np.log(BX)/1.11e-4/amf
+    BXXX=np.log(BX)/1.11e-4/inv_cos_za
     BXXX[BXXX>500] = 999
     BXXX[BXXX<0] = 999
     
-    # Correcting TOA reflectance for ozone and water scattering
-    
+    # Correcting TOA reflectance for ozone absorption
                 # bav 09-02-2020: now water scattering not accounted for
                 # kg/m**2. transfer to mol/cm**2         
             #    roznov = 2.99236e-22  # 1 moles Ozone = 47.9982 grams  
                 # water vapor optical depth      
             #    vap = water/roznov
-            #    AKOWAT = vap/3.847e+22#    tvoda = np.exp(amf*voda*AKOWAT)
+            #    AKOWAT = vap/3.847e+22#    tvoda = np.exp(inv_cos_za*voda*AKOWAT)
     tvoda=tozon*0+1
     toa_cor_o3=toa*np.nan;
     for i in range(21):
-        toa_cor_o3[i,:,:] = toa[i,:,:]*tvoda[i]*np.exp(amf*tozon[i]*totadu/404.59)
+        toa_cor_o3[i,:,:] = toa[i,:,:]*tvoda[i]*np.exp(inv_cos_za*tozon[i]*totadu/404.59)
     
     return BXXX, toa_cor_o3
 #%% viewing characteristics and aerosol properties
@@ -133,22 +132,30 @@ def ozone_scattering(ozone,tozon,sza,vza,toa):
 def view_geometry(vaa, saa, sza, vza, aot, height):
     # transfer of OLCI relative azimuthal angle to the definition used in
     # radiative transfer code  
+    # raa       relative azimuth angle
+    # sza       solar zenith angle
+    # vza       viewing zenith angle
+    # cos_sa       cosine of the scattering angle 
+    # ak1
+    # ak2
+
     raa=180.-(vaa-saa)                  
-    as1=np.sin(sza*np.pi/180.)
-    as2=np.sin(vza*np.pi/180.)
+    sin_sza=np.sin(sza*np.pi/180.)
+    sin_vza=np.sin(vza*np.pi/180.)
     
-    am1=np.cos(sza*np.pi/180.)
-    am2=np.cos(vza*np.pi/180.)
+    cos_sza=np.cos(sza*np.pi/180.)
+    cos_vza=np.cos(vza*np.pi/180.)
                         
-    ak1=3.*(1.+2.*am1)/7.
-    ak2=3.*(1.+2.*am2)/7.
+    ak1=3.*(1.+2.*cos_sza)/7.
+    ak2=3.*(1.+2.*cos_vza)/7.
     
-    cofi=np.cos(raa*np.pi/180.)
-    amf=1./am1+1./am2
-    co=-am1*am2+as1*as2*cofi
-    return raa, am1, am2, ak1, ak2, amf, co
+    cos_raa  =np.cos(raa*np.pi/180.)
+    inv_cos_za=1./cos_sza+1./cos_vza
+    cos_sa=-cos_sza*cos_vza + sin_sza*sin_vza*cos_raa
+    
+    return raa, cos_sza, cos_vza, ak1, ak2, inv_cos_za, cos_sa
 #%%     
-def aerosol_properties(aot, height, co):
+def aerosol_properties(aot, height, cos_sa):
     # Atmospheric optical thickness
     tauaer =aot*(w/0.5)**(-1.3)
 
@@ -165,7 +172,7 @@ def aerosol_properties(aot, height, co):
     g1=0.4627
     wave0=0.4685
     gaer=g0+g1*np.exp(-w/wave0)
-    pr=0.75*(1.+co**2)
+    pr=0.75*(1.+cos_sa**2)
     
     for i in range(21):
         taumol[i,:,:] = ak*0.00877/w[i]**(4.05)
@@ -175,7 +182,7 @@ def aerosol_properties(aot, height, co):
         g[i,:,:]=tauaer[i]*gaer[i]/tau[i,:,:]
         
         # HG phase function for aerosol
-        pa[i,:,:]=(1-g[i,:,:]**2)/(1.-2.*g[i,:,:]*co+g[i,:,:]**2)**1.5
+        pa[i,:,:]=(1-g[i,:,:]**2)/(1.-2.*g[i,:,:]*cos_sa+g[i,:,:]**2)**1.5
 
         p[i,:,:]=(taumol[i,:,:]*pr + tauaer[i]*pa[i,:,:])/tau[i,:,:]
     
@@ -206,7 +213,7 @@ def snow_properties(toa, ak1, ak2):
     return  D, area, al, r0, bal
 
 #%% =================================================
-def prepare_coef(tau, g, p, am1, am2, amf,gaer,taumol,tauaer):
+def prepare_coef(tau, g, p, cos_sza, cos_vza, inv_cos_za, gaer, taumol, tauaer):
     astra=tau*np.nan
     rms=tau*np.nan
     t1=tau*np.nan
@@ -214,8 +221,8 @@ def prepare_coef(tau, g, p, am1, am2, amf,gaer,taumol,tauaer):
     
     # SOBOLEV
     oskar=4.+3.*(1.-g)*tau
-    b1=1.+1.5*am1+(1.-1.5*am1)*np.exp(-tau/am1)
-    b2=1.+1.5*am2+(1.-1.5*am2)*np.exp(-tau/am2)
+    b1=1.+1.5*cos_sza+(1.-1.5*cos_sza)*np.exp(-tau/cos_sza)
+    b2=1.+1.5*cos_vza+(1.-1.5*cos_vza)*np.exp(-tau/cos_vza)
 
     wa1=1.10363
     wa2=-6.70122
@@ -225,14 +232,14 @@ def prepare_coef(tau, g, p, am1, am2, amf,gaer,taumol,tauaer):
     sssss=  (wa1-wa2)/(1.+bex)+wa2
 
     for i in range(21):
-        astra[i,:,:]=(1.-np.exp(-tau[i,:,:]*amf))/(am1+am2)/4.
+        astra[i,:,:]=(1.-np.exp(-tau[i,:,:]*inv_cos_za))/(cos_sza+cos_vza)/4.
         rms[i,:,:] = 1.- b1[i,:,:]*b2[i,:,:]/oskar[i,:,:]  \
-        + (3.*(1.+g[i,:,:])*am1*am2 - 2.*(am1+am2))*astra[i,:,:]
+        + (3.*(1.+g[i,:,:])*cos_sza*cos_vza - 2.*(cos_sza+cos_vza))*astra[i,:,:]
         #backscattering fraction
-        # t1[i,:,:] = np.exp(-(1.-g[i,:,:])*tau[i,:,:]/am1/2.)
-        # t2[i,:,:] = np.exp(-(1.-g[i,:,:])*tau[i,:,:]/am2/2.)
-        t1[i,:,:]=np.exp(-(1.-g[i,:,:])*tau[i,:,:]/am1/2./sssss[i,:,:])
-        t2[i,:,:]=np.exp(-(1.-g[i,:,:])*tau[i,:,:]/am2/2./sssss[i,:,:])
+        # t1[i,:,:] = np.exp(-(1.-g[i,:,:])*tau[i,:,:]/cos_sza/2.)
+        # t2[i,:,:] = np.exp(-(1.-g[i,:,:])*tau[i,:,:]/cos_vza/2.)
+        t1[i,:,:]=np.exp(-(1.-g[i,:,:])*tau[i,:,:]/cos_sza/2./sssss[i,:,:])
+        t2[i,:,:]=np.exp(-(1.-g[i,:,:])*tau[i,:,:]/cos_vza/2./sssss[i,:,:])
       
     rss = p*astra
     r = rss + rms
@@ -280,17 +287,17 @@ def snow_impurities(alb_sph, bal):
     bf=soda*p1/bal
                  
     # normalized absorption coefficient of pollutants at the wavelength  1000nm
-    bff=p1/bal
+    k_abs_0=p1/bal
     # bal   -effective absorption length in microns
    
-    BBBB=1.6        # enhancement factors for soot
-    FFFF= 0.9       # enhancement factors for ice grains
-    alfa=4.*np.pi*0.47/w[0]  # bulk soot absorption coefficient at 1000nm
-    DUST=0.01       # volumetric absorption coefficient of dust
+    B_soot=1.6        # enhancement factors for soot
+    B_ice= 0.9       # enhancement factors for ice grains
+    alfa_soot=4.*np.pi*0.47/w[0]  # bulk soot absorption coefficient at 1000nm
+    k_dust=0.01       # volumetric absorption coefficient of dust
 
     conc = bal*np.nan
-    conc[ntype == 1] = BBBB*bff[ntype == 1]/FFFF/alfa
-    conc[ntype == 2] = BBBB*bff[ntype == 2]/DUST
+    conc[ntype == 1] = B_soot*k_abs_0[ntype == 1]/B_ice/alfa_soot
+    conc[ntype == 2] = B_soot*k_abs_0[ntype == 2]/k_dust
     ntype[bm <= 0.5] = 3 # type is other or mixture
     ntype[bm >= 10.] = 4 # type is other or mixture
     return ntype, bf, conc
@@ -444,12 +451,12 @@ def funp(x, al, sph_calc, ak1):
     return rs*funcs
 
 #%% Approximation functions for BBA integration
-def plane_albedo_sw_approx(D,am1):
-    anka= 0.7389  -0.1783*am1    +0.0484*am1**2.
-    banka=0.0853  +0.0414*am1    -0.0127*am1**2.
-    canka=0.1384  +0.0762*am1    -0.0268*am1**2.
-    diam1=187.89  -69.2636*am1     +40.4821*am1**2.
-    diam2=2687.25 -405.09*am1   +94.5*am1**2.
+def plane_albedo_sw_approx(D,cos_sza):
+    anka= 0.7389  -0.1783*cos_sza    +0.0484*cos_sza**2.
+    banka=0.0853  +0.0414*cos_sza    -0.0127*cos_sza**2.
+    canka=0.1384  +0.0762*cos_sza    -0.0268*cos_sza**2.
+    diam1=187.89  -69.2636*cos_sza     +40.4821*cos_sza**2.
+    diam2=2687.25 -405.09*cos_sza   +94.5*cos_sza**2.
     return anka+banka*np.exp(-1000*D/diam1)+canka*np.exp(-1000*D/diam2)
 
 def spher_albedo_sw_approx(D):

@@ -149,8 +149,9 @@ height = height.astype(float)
 height[ ~np.isnan(isnow)] = np.nan
 
 # =========== view geometry and atmosphere propeties  ==============
-raa, am1, am2, ak1, ak2, amf, co = sl.view_geometry(vaa, saa, sza, vza, aot, height)
-tau, p, g,gaer,taumol,tauaer = sl.aerosol_properties(aot, height, co)
+raa, cos_sza, cos_vza, ak1, ak2, inv_cos_za, cos_sa = sl.view_geometry(vaa, saa, sza, vza, aot, height)
+
+tau, p, g, gaer,taumol,tauaer = sl.aerosol_properties(aot, height, cos_sa)
         
 # =========== snow properties  ====================================
 D, area, al, r0, bal = sl.snow_properties(toa_cor_o3, ak1, ak2)
@@ -164,15 +165,15 @@ area[D<D_thresh] = np.nan
 al[D<D_thresh] = np.nan
 r0[D<D_thresh] = np.nan
 bal[D<D_thresh] = np.nan
-am1[D<D_thresh] = np.nan
-am2[D<D_thresh] = np.nan
+cos_sza[D<D_thresh] = np.nan
+cos_vza[D<D_thresh] = np.nan
 #D[D<D_thresh] = np.nan
 
 # =========== clean snow  ====================================
 # for that we calculate the theoretical reflectance at band 1 of a surface with:
 # r0 = 1, a (albedo) = 1, ak1 = 1, ak2 = 1
 # t1 and t2 are the backscattering fraction
-t1, t2, ratm, r, astra, rms = sl.prepare_coef(tau, g, p, am1, am2, amf,gaer,taumol,tauaer)
+t1, t2, ratm, r, astra, rms = sl.prepare_coef(tau, g, p, cos_sza, cos_vza, inv_cos_za,gaer,taumol,tauaer)
 rs_1 = sl.alb2rtoa(1, t1[0,:,:], t2[0,:,:], np.ones_like(r0), np.ones_like(ak1), 
                    np.ones_like(ak2), ratm[0,:,:], r[0,:,:])
 
@@ -188,28 +189,29 @@ def mult_channel(c,A):
 alb_sph = np.exp(-np.sqrt(1000.*4.*np.pi* mult_channel(bai/w, np.tile(al,(21,1,1)))))
 alb_sph[alb_sph>0.999]=1
 
-# ========== very dirty snow  ====================================
+# =========== polluted snow  ====================================
 ind_pol = toa_cor_o3[0,:,:] < rs_1
 
 isnow[ind_pol] = 1
 
+#  very dirty snow  
 ind_very_dark = np.logical_and(toa_cor_o3[20,:,:]<0.4, ind_pol)
 isnow[ind_very_dark] = 6
 
-am11=np.sqrt(1.-am1[ind_very_dark]**2.)
-am12=np.sqrt(1.-am2[ind_very_dark]**2.)
+am11=np.sqrt(1.-cos_sza[ind_very_dark]**2.)
+am12=np.sqrt(1.-cos_vza[ind_very_dark]**2.)
 
-tz=np.arccos(-am1[ind_very_dark] * am2[ind_very_dark] + am11 * am12 * np.cos(raa[ind_very_dark]*3.14159/180.))  *180./np.pi
+theta = np.arccos(-cos_sza[ind_very_dark] * cos_vza[ind_very_dark] + am11 * am12 * np.cos(raa[ind_very_dark]*3.14159/180.))  *180./np.pi
              
-pz=11.1*np.exp(-0.087*tz)+1.1*np.exp(-0.014*tz)
+pz=11.1*np.exp(-0.087*theta)+1.1*np.exp(-0.014*theta)
 
-rclean = 1.247 + 1.186 *(am1[ind_very_dark]+am2[ind_very_dark]) +  5.157 * am1[ind_very_dark] * am2[ind_very_dark] + pz
+rclean = 1.247 + 1.186 *(cos_sza[ind_very_dark]+cos_vza[ind_very_dark]) +  5.157 * cos_sza[ind_very_dark] * cos_vza[ind_very_dark] + pz
 
-rclean = rclean /4. /(am1[ind_very_dark] + am2[ind_very_dark])
+rclean = rclean /4. /(cos_sza[ind_very_dark] + cos_vza[ind_very_dark])
 
 r0[ind_very_dark] = rclean
+#  end very dirty snow  
 
-# =========== polluted snow  ====================================
 ind_pol =  np.logical_or(ind_very_dark, ind_pol)
 if np.any(ind_pol):
     subs_pol = np.argwhere(ind_pol)
@@ -306,7 +308,7 @@ ind_all_clean = np.logical_or(ind_clean, isnow == 7)
 # approximation
 # planar albedo
 #rp1 and rp2 not derived anymore
-rp3[ind_all_clean]=sl.plane_albedo_sw_approx(D[ind_all_clean],am1[ind_all_clean])
+rp3[ind_all_clean]=sl.plane_albedo_sw_approx(D[ind_all_clean],cos_sza[ind_all_clean])
 #     spherical albedo
 #rs1 and rs2 not derived anymore
 rs3[ind_all_clean]= sl.spher_albedo_sw_approx(D[ind_all_clean])

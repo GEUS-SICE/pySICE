@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 import matplotlib as mpl
 from mpl_toolkits.axes_grid1 import make_axes_locatable  
+import pandas as pd
 
 def OutlookRaster(var,title):
     l,b,r,t = var.bounds
@@ -98,9 +99,29 @@ def heatmap_discrete(var, title='', col_lim=(np.nan, np.nan) ,cmap_in='tab20_r')
 #    fig.write_image(title+".jpeg")
     return fig,ax
     
-    #%% =================================================================
-def tmp(**kwargs):
-    for arg_name in kwargs:
-        return arg_name
+#%% Plot OLCI bands
+def plot_OLCI_bands(ax):
+# pots olci bands in the background
+
+    olci_bands = pd.read_excel (r'misc/olci_bands.xlsx',header=0,thousands=' ')
+    #Out[409]: Index(['Band', 'λ centre (nm)', 'Width (nm)', 'Function'], dtype='object')
+    
+    ax.set_xlabel('Wavelength (nm)')
+    #ax.autoscale(enable=True, tight=True)
+    ax.bar(olci_bands['λ centre (nm)'], ax.get_ylim()[1], olci_bands['Width (nm)'], alpha=0.5, edgecolor ='darkblue', label='OLCI bands')
+    
+    ax.set_xlim(350, 1050)
+    
+    height_text = np.array((2, 2.3, 2.3, 2.3, 2.3, 2.3, 
+                                  2.3, 2, 2.4 , 
+                                  1.7,2, 1.6, 2, 2.5,
+                                  1.25, 1.7, 2, 1.7,2,2, 2))/3 *ax.get_ylim()[1]
+    for i in range(1,22):
+        ax.annotate(str(i),
+                    (olci_bands['λ centre (nm)'][i-1], height_text[i-1]), 
+                    ha='center',
+                    bbox=dict(boxstyle="circle", fc="w"),
+                    fontsize =13)
+    return ax
 
 
