@@ -21,8 +21,8 @@ import bav_lib as bl
 
 start_time = time.time()
 
-# InputFolder = sys.argv[1] + '/'
-InputFolder = 'out/SICE_2020_py1.4/'
+InputFolder = sys.argv[1] + '/'
+# InputFolder = 'out/SICE_2020_py1.4/'
 
 print(os.getcwd())
 
