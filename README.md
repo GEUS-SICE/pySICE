@@ -19,14 +19,14 @@ The Algorithm Theoretical Basis Document is available [here](docs/atbd/FINAL_SIC
 ## Script description
 
 ### Script overview
-![](docs/atbd/ATBD plots1.png)
+![](docs/atbd/ATBD_plots1.png)
 
 ### Input preparation
-![](docs/atbd/SICE overview1.png)
+![](docs/atbd/SICE_overview1.png)
 
 ### Clean or polluted snow pixels
-![](docs/atbd/SICE overview2.png)
+![](docs/atbd/SICE_overview2.png)
 
 ### Bottom of the atmosphere reflectance and broadband albedo
-![](docs/atbd/SICE overview3.png)
+![](docs/atbd/SICE_overview3.png)
 
