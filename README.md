@@ -50,7 +50,8 @@ The Algorithm Theoretical Basis Document is available [here](docs/atbd/FINAL_SIC
 ### Input preparation
 
 Input files:
-
+|File |Description|
+|----------|:-------------:|
 | height.tif  | Height in metre|
 | mask.tif| Ice mask|
 | O3.tif   | Total column ozone|
