@@ -56,7 +56,7 @@ Input files:
 | O3.tif   | Total column ozone|
 | OZA.tif  | Observation zenith angle|
 | OAA.tif  | Observation azimuth angle|
-| r_TOA_01.tif <br> r_TOA_02.tif <br> r_TOA_03.tif  <br>r_TOA_04.tif <br>r_TOA_05.tif <br>r_TOA_06.tif   <br>r_TOA_07.tif <br>r_TOA_08.tif <br>r_TOA_09.tif <br>r_TOA_10.tif <br>r_TOA_11.tif <br>r_TOA_12.tif <br>r_TOA_13.tif <br>r_TOA_14.tif <br>r_TOA_15.tif <br>r_TOA_16.tif <br>r_TOA_17.tif <br>r_TOA_18.tif <br>r_TOA_19.tif <br>r_TOA_20.tif<br>r_TOA_21.tif| Top of the atmosphere OLCI reflectance|
+| r_TOA_01..21.tif | Top of the atmosphere OLCI reflectance|
 | SZA.tif  | Solar Zenith angle|
 | SAA.tif  | Solar azimuth angle|
 | WV.tif  | Water vapor|
