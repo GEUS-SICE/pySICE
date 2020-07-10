@@ -4,7 +4,4 @@ __pycache__/
 out/*
 Plots/*
 Data/*
-
-Fortran/*
-fortran/*
 doc/*

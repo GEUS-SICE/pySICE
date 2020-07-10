@@ -11,8 +11,8 @@ by  B. Vandecrux (2), A. Kokhanovsky (1), J. Box (2)
 ## Table of Contents  
 * [Running environment](#running-environment)  
 * [Theoretical background](#theoretical-background)  
-* [Script description](#script-description)  
-    * [Script overview](#script-overview)  
+* [Scripts description](#scripts-description)  
+    * [Scripts overview](#scripts-overview)  
     * [Input preparation](#input-preparation)  
     * [Clean or polluted snow pixels](#clean-or-polluted-snow-pixels)  
     * [Bottom of the atmosphere reflectance and broadband albedo](#bottom-of-the-atmosphere-reflectance-and-broadband-albedo)  
@@ -25,9 +25,9 @@ uses numpy, rasterio, time and sys packages
 
 The Algorithm Theoretical Basis Document is available [here](docs/atbd/FINAL_SICE_ATBD__v3.0_MAY06_2020.pdf)
 
-## Script description
+## Scripts description
 
-### Script overview
+### Scripts overview
 ![](docs/atbd/ATBD_plots1.png)
 
 ### Input preparation
