@@ -14,7 +14,19 @@ uses numpy, rasterio, time and sys packages
 
 ## Theoretical background
 
-The Algorithm Theoretical Basis Document is available [here]((docs/atbd/FINAL_SICE_ATBD__v3.0_MAY06_2020.pdf)
+The Algorithm Theoretical Basis Document is available [here](docs/atbd/FINAL_SICE_ATBD__v3.0_MAY06_2020.pdf)
 
 ## Script description
+
+### Script overview
+![](docs/atbd/ATBD plots1.png)
+
+### Input preparation
+![](docs/atbd/SICE overview1.png)
+
+### Clean or polluted snow pixels
+![](docs/atbd/SICE overview2.png)
+
+### Bottom of the atmosphere reflectance and broadband albedo
+![](docs/atbd/SICE overview3.png)
 
