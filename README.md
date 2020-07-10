@@ -57,6 +57,7 @@ The Algorithm Theoretical Basis Document is available [here](docs/atbd/FINAL_SIC
 ![](docs/atbd/SICE_overview2.png)
 
 <a name="test"/>
+
 ### Bottom of the atmosphere reflectance and broadband albedo
 ![](docs/atbd/SICE_overview3.png)
 
@@ -68,6 +69,7 @@ We recommend the use of [Anaconda](https://www.anaconda.com/products/individual)
 
 
 <a name="download"/>
+
 # Download pySICE
 
 Download the repository using the browser or typing in your command prompt

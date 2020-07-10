@@ -133,7 +133,7 @@ BXXX, isnow, D, area, al, r0, isnow, conc, ntype, rp1, rp2, rp3, rs1, rs2, rs3 =
 alb_sph, rp, refl =  toa*np.nan, toa*np.nan, toa*np.nan
 
 #%% =========== ozone scattering  ====================================
-BXXX, toa_cor_o3 = sl.ozone_scattering(ozone,tozon, sza, vza,toa)
+BXXX, toa_cor_o3 = sl.molecular_absorption(ozone,tozon, sza, vza,toa)
 
 # Filtering pixels unsuitable for retrieval
 isnow[sza>75] = 100
