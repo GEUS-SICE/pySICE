@@ -15,8 +15,16 @@ by  B. Vandecrux (2), A. Kokhanovsky (1), J. Box (2)
     * [Scripts overview](#scripts-overview)  
     * [Input preparation](#input-preparation)  
     * [Clean or polluted snow pixels](#clean-or-polluted-snow-pixels)  
-    * [Bottom of the atmosphere reflectance and broadband albedo](#bottom-of-the-atmosphere-reflectance-and-broadband-albedo)  
+    * [Bottom of the atmosphere reflectance and broadband albedo](#test)  
+* [Installation](#installation)  
+    * [Python](#python)
+    * [Download pySICE](#download)
+* [Examples](#examples)  
+    * [pySICE](#pytsice)
+    * [Python interface for the fortran script sice.f	](#sicef)
 
+
+	
 ## Running environment
 developped on Python 3.7.6
 uses numpy, rasterio, time and sys packages
@@ -48,14 +56,18 @@ The Algorithm Theoretical Basis Document is available [here](docs/atbd/FINAL_SIC
 ### Clean or polluted snow pixels
 ![](docs/atbd/SICE_overview2.png)
 
+<a name="test"/>
 ### Bottom of the atmosphere reflectance and broadband albedo
 ![](docs/atbd/SICE_overview3.png)
 
 ## Installation
+
 # Python
 
 We recommend the use of [Anaconda](https://www.anaconda.com/products/individual) and recent version of Python (>3.7).
 
+
+<a name="download"/>
 # Download pySICE
 
 Download the repository using the browser or typing in your command prompt
@@ -71,6 +83,7 @@ Test input files are available [here](https://www.dropbox.com/s/9pb9n0k54ev3yg4/
 
 
 
+<a name="sicef"/>
 ### Python interface for the fortran script sice.f
 
 
