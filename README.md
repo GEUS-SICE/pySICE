@@ -9,15 +9,13 @@ by  B. Vandecrux (2), A. Kokhanovsky (1), J. Box (2)
 
 
 ## Table of Contents  
-[Running environment](#running-environment)  
-[Theoretical background](#theoretical-background)  
-[Script description](#script-description)  
-	[Script overview](#script-overview)  
-	[Input preparation](#input-preparation)  
-	[Clean or polluted snow pixels](#clean-or-polluted-snow-pixels)  
-	[Bottom of the atmosphere reflectance and broadband albedo](#bottom-of-the-atmosphere reflectance-and-broadband-albedo)  
-...snip...    
-<a name="headers"/>
+*[Running environment](#running-environment)  
+*[Theoretical background](#theoretical-background)  
+*[Script description](#script-description)  
+	*[Script overview](#script-overview)  
+	*[Input preparation](#input-preparation)  
+	*[Clean or polluted snow pixels](#clean-or-polluted-snow-pixels)  
+	*[Bottom of the atmosphere reflectance and broadband albedo](#bottom-of-the-atmosphere-reflectance-and-broadband-albedo)  
 
 ## Running environment
 developped on Python 3.7.6
