@@ -33,7 +33,7 @@ The snow surface characteristics retrieval is based on the following work:
 * [Kokhanovsky et al. (2018) On the reflectance spectroscopy of snow](https://tc.copernicus.org/articles/12/2371/2018/)
 * [Kokhanovsky et al. (2019) Retrieval of Snow Properties from the Sentinel-3
 Ocean and Land Colour Instrument](http://dx.doi.org/10.3390/rs11192280)
-* [Kokhanovsky et al. (2018) The Determination of Snow Albedo from Satellite
+* [Kokhanovsky et al. (2020) The Determination of Snow Albedo from Satellite
 Measurements Using Fast Atmospheric
 Correction Technique](http://dx.doi.org/10.3390/rs12020234)
 
@@ -51,35 +51,35 @@ The Algorithm Theoretical Basis Document is available [here](docs/atbd/FINAL_SIC
 
 Input files:
 
-    height.tif  | Height in metre
-    mask.tif    | Ice mask
-    O3.tif       | Total column ozone
-    OZA.tif      | Observation zenith angle
-    OAA.tif      | Observation azimuth angle
-    r_TOA_01.tif    | Top of the atmosphere OLCI reflectance
-    r_TOA_02.tif    | 
-    r_TOA_03.tif    | 
-    r_TOA_04.tif    | 
-    r_TOA_05.tif    | 
-    r_TOA_06.tif    |   
-    r_TOA_07.tif    | 
-    r_TOA_08.tif    | 
-    r_TOA_09.tif    | 
-    r_TOA_10.tif    | 
-    r_TOA_11.tif    | 
-    r_TOA_12.tif    | 
-    r_TOA_13.tif    | 
-    r_TOA_14.tif    | 
-    r_TOA_15.tif    | 
-    r_TOA_16.tif    | 
-    r_TOA_17.tif    | 
-    r_TOA_18.tif    | 
-    r_TOA_19.tif    | 
-    r_TOA_20.tif    | 
-    r_TOA_21.tif    | 
-    SZA.tif      | Solar Zenith angle
-    SAA.tif      | Solar azimuth angle
-    WV.tif  | Water vapor
+| height.tif  | Height in metre|
+| mask.tif| Ice mask|
+| O3.tif   | Total column ozone|
+| OZA.tif  | Observation zenith angle|
+| OAA.tif  | Observation azimuth angle|
+| r_TOA_01.tif 
+ r_TOA_02.tif 
+ r_TOA_03.tif 
+r_TOA_04.tif 
+r_TOA_05.tif 
+r_TOA_06.tif   
+r_TOA_07.tif 
+r_TOA_08.tif 
+r_TOA_09.tif 
+r_TOA_10.tif 
+r_TOA_11.tif 
+r_TOA_12.tif 
+r_TOA_13.tif 
+r_TOA_14.tif 
+r_TOA_15.tif 
+r_TOA_16.tif 
+r_TOA_17.tif 
+r_TOA_18.tif 
+r_TOA_19.tif 
+r_TOA_20.tif 
+r_TOA_21.tif| Top of the atmosphere OLCI reflectance|
+| SZA.tif  | Solar Zenith angle|
+| SAA.tif  | Solar azimuth angle|
+| WV.tif  | Water vapor|
   
 ![](docs/atbd/SICE_overview1.png)
 
@@ -134,6 +134,7 @@ The output is added to the S3_test_data folder.
 <a name="sicef"/>
 
 ### Python interface for the fortran script sice.f
+sice_f.py reads the SICE-generated S3 geotiff files, converts them into ascii files, compiles and runs sice.f, reads the text outputs and save them into geotiff again.
 
 Compile sice.f:
 
