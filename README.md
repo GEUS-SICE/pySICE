@@ -36,7 +36,6 @@ Ocean and Land Colour Instrument](http://dx.doi.org/10.3390/rs11192280)
 * [Kokhanovsky et al. (2018) The Determination of Snow Albedo from Satellite
 Measurements Using Fast Atmospheric
 Correction Technique](http://dx.doi.org/10.3390/rs12020234)
-* [Kokhanovsky et al. (2018) On the reflectance spectroscopy of snow](https://tc.copernicus.org/articles/12/2371/2018/)
 
 The ozone total ozone retreival is described in 
 * [Kokhanovsky et al. (2020) Retrieval of the total ozone over Antarctica using Sentinel-3 ocean and land colour instrument](https://doi.org/10.1016/j.jqsrt.2020.107045)
@@ -49,6 +48,39 @@ The Algorithm Theoretical Basis Document is available [here](docs/atbd/FINAL_SIC
 ![](docs/atbd/ATBD_plots1.png)
 
 ### Input preparation
+
+Input files:
+
+    height.tif  | Height in metre
+    mask.tif    | Ice mask
+    O3.tif       | Total column ozone
+    OZA.tif      | Observation zenith angle
+    OAA.tif      | Observation azimuth angle
+    r_TOA_01.tif    | Top of the atmosphere OLCI reflectance
+    r_TOA_02.tif    | 
+    r_TOA_03.tif    | 
+    r_TOA_04.tif    | 
+    r_TOA_05.tif    | 
+    r_TOA_06.tif    |   
+    r_TOA_07.tif    | 
+    r_TOA_08.tif    | 
+    r_TOA_09.tif    | 
+    r_TOA_10.tif    | 
+    r_TOA_11.tif    | 
+    r_TOA_12.tif    | 
+    r_TOA_13.tif    | 
+    r_TOA_14.tif    | 
+    r_TOA_15.tif    | 
+    r_TOA_16.tif    | 
+    r_TOA_17.tif    | 
+    r_TOA_18.tif    | 
+    r_TOA_19.tif    | 
+    r_TOA_20.tif    | 
+    r_TOA_21.tif    | 
+    SZA.tif      | Solar Zenith angle
+    SAA.tif      | Solar azimuth angle
+    WV.tif  | Water vapor
+  
 ![](docs/atbd/SICE_overview1.png)
 
 ### Clean or polluted snow pixels
@@ -91,6 +123,7 @@ unzip S3_test_data.zip -d S3_test_data
 
 Simply run:
 
+
 ```
 python sice.py ./S3_test_data
 ```
@@ -101,6 +134,19 @@ The output is added to the S3_test_data folder.
 <a name="sicef"/>
 
 ### Python interface for the fortran script sice.f
+
+Compile sice.f:
+
+```
+gfortran ./fortran/sice.f -o ./fortran/sice.exe
+```
+
+Create the output folder and run the script:
+
+```
+mkdir S3_test_data/fortran
+python fortran/sice_f.py ./S3_test_data
+```
 
 
 
