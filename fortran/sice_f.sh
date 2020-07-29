@@ -12,8 +12,7 @@ MSG_ERR() { printf "${RED}ERROR: ${1}${NC}\n"; }
 
 timing() { if [[ $TIMING == 1 ]]; then MSG_OK "$(date)"; fi; }
 
-while [[ $# -gt 0 ]]
-do
+while [[ $# -gt 0 ]]; do
     key="$1"
     
     case $key in
@@ -39,7 +38,7 @@ fi
 DEST=${INPATH}
 
 timing
-
+MSG_OK ${DEST}
 # input for sice
 # ns,alat,alon,sza,vza,saa,vaa,height,(toa(iks),iks=1,21), ozone, water
 # The number of lines in this file MUST be equal to the number of lines in the file 'nlines.dat'

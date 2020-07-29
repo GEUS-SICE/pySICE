@@ -81,45 +81,75 @@ import sice_lib as sl
 import rasterio as rio
 import time
 import sys
+import os
+import pandas as pd
 from constants import w, bai, sol1_clean, sol2, sol3_clean, sol1_pol, sol3_pol, asol
 np.seterr(invalid='ignore')
 
 start_time = time.process_time()
+print(sys.argv[1])
 
-InputFolder =  sys.argv[1] + '/'
-
-#%% ========= input tif ================
-Oa01 = rio.open(InputFolder+'r_TOA_01.tif')
-meta = Oa01.meta
-with rio.Env():    
-    meta.update(compress='DEFLATE')
-
-def WriteOutput(var,var_name,in_folder):
-    # this functions write tif files based on a model file, here "Oa01"
-    # opens a file for writing
-
-    with rio.open(in_folder+var_name+'.tif', 'w+', **meta) as dst:
-        dst.write(var.astype('float32'),1)
+#%% input text file
+if os.path.isfile(sys.argv[1]):  
+    InputFolder = os.path.dirname(os.path.dirname(sys.argv[1]))+'/'
+    print('\nText file input')
+    # data_in = pd.read_csv(sys.argv[1])
+    data_in = pd.read_csv(sys.argv[1])
+    toa = np.expand_dims(data_in[[c for c in data_in.columns if c.find('reflec')>=0]].to_numpy().transpose(), axis=2)
     
-toa = np.tile(Oa01.read(1)*np.nan, (21,1,1))
-
-for i in range(21):
-    dat = rio.open((InputFolder+'r_TOA_'+str(i+1).zfill(2)+'.tif'))
-    toa[i,:,:] = dat.read(1)
+        
+    ozone = np.expand_dims(data_in['total_ozone'], axis=1)
+    water = np.expand_dims(data_in['total_columnar_water_vapour'], axis=1)
+    sza = np.expand_dims(data_in['sza'], axis=1)
+    saa = np.expand_dims(data_in['saa'], axis=1)
+    vza = np.expand_dims(data_in['vza'], axis=1)
+    vaa = np.expand_dims(data_in['vaa'], axis=1)
+    height = np.expand_dims(data_in['altitude'], axis=1)
     
-ozone = rio.open(InputFolder+'O3.tif').read(1)
-water = rio.open(InputFolder+'WV.tif').read(1)
-sza = rio.open(InputFolder+'SZA.tif').read(1)
-saa = rio.open(InputFolder+'SAA.tif').read(1)
-vza = rio.open(InputFolder+'OZA.tif').read(1)
-vaa = rio.open(InputFolder+'OAA.tif').read(1)
-height = rio.open(InputFolder+'height.tif').read(1)
+    sza[np.isnan(toa[0,:,:])] = np.nan
+    saa[np.isnan(toa[0,:,:])] = np.nan
+    vza[np.isnan(toa[0,:,:])] = np.nan
+    vaa[np.isnan(toa[0,:,:])] = np.nan   
 
-sza[np.isnan(toa[0,:,:])] = np.nan
-saa[np.isnan(toa[0,:,:])] = np.nan
-vza[np.isnan(toa[0,:,:])] = np.nan
-vaa[np.isnan(toa[0,:,:])] = np.nan
+#%% ========= input tif ===============
+elif os.path.isdir(sys.argv[1]):
+    InputFolder =  sys.argv[1] + '/'
+    print("\nTiff files input")  
+    Oa01 = rio.open(InputFolder+'r_TOA_01.tif')
+    meta = Oa01.meta
+    with rio.Env():    
+        meta.update(compress='DEFLATE')
+    
+    def WriteOutput(var,var_name,in_folder):
+        # this functions write tif files based on a model file, here "Oa01"
+        # opens a file for writing
+    
+        with rio.open(in_folder+var_name+'.tif', 'w+', **meta) as dst:
+            dst.write(var.astype('float32'),1)
+        
+    toa = np.tile(Oa01.read(1)*np.nan, (21,1,1))
+    
+    for i in range(21):
+        dat = rio.open((InputFolder+'r_TOA_'+str(i+1).zfill(2)+'.tif'))
+        toa[i,:,:] = dat.read(1)
+        
+    ozone = rio.open(InputFolder+'O3.tif').read(1)
+    water = rio.open(InputFolder+'WV.tif').read(1)
+    sza = rio.open(InputFolder+'SZA.tif').read(1)
+    saa = rio.open(InputFolder+'SAA.tif').read(1)
+    vza = rio.open(InputFolder+'OZA.tif').read(1)
+    vaa = rio.open(InputFolder+'OAA.tif').read(1)
+    height = rio.open(InputFolder+'height.tif').read(1)
+    
+    sza[np.isnan(toa[0,:,:])] = np.nan
+    saa[np.isnan(toa[0,:,:])] = np.nan
+    vza[np.isnan(toa[0,:,:])] = np.nan
+    vaa[np.isnan(toa[0,:,:])] = np.nan
+    
+else:  
+    print("\n Input path neither file or directory" )
 
+# %% water and ozone spectral optical density    
 water_vod = genfromtxt('./tg_water_vod.dat', delimiter='   ')
 voda = water_vod[range(21),1]
 
@@ -320,20 +350,44 @@ rs1[ind_pol], rs2[ind_pol], rs3[ind_pol] = sl.BBA_calc_pol(
         alb_sph[:, ind_pol], asol, sol1_pol, sol2, sol3_pol)
                
 #%% Output
-WriteOutput(BXXX,   'O3_SICE',   InputFolder)
-WriteOutput(D,      'grain_diameter',InputFolder)
-WriteOutput(area,   'snow_specific_area', InputFolder)
-WriteOutput(al,   'al',     InputFolder)
-WriteOutput(r0,   'r0',InputFolder)
-WriteOutput(isnow,'diagnostic_retrieval',InputFolder)
-WriteOutput(conc, 'conc',InputFolder)
-WriteOutput(rp3,  'albedo_bb_planar_sw',InputFolder)
-WriteOutput(rs3,  'albedo_bb_spherical_sw',InputFolder)
+if os.path.isfile(sys.argv[1]):  
+    
+    print('\nText file output')
+    # data_in = pd.read_csv(sys.argv[1])
+    data_out = data_in
+    data_out['grain_diameter']=D
+    data_out['snow_specific_area']=area
+    data_out['al']=al
+    data_out['r0']=r0
+    data_out['diagnostic_retrieval']=isnow
+    data_out['conc']=conc
+    data_out['albedo_bb_planar_sw']=rp3
+    data_out['albedo_bb_spherical_sw']=rs3
+    
+    
+    for i in np.append(np.arange(11), np.arange(15,21)):
+    # for i in np.arange(21):
+        data_out['albedo_spectral_spherical_'+str(i+1).zfill(2)]=alb_sph[i,:,:]
+    for i in np.append(np.arange(11), np.arange(15,21)):
+        data_out['rBRR_'+str(i+1).zfill(2)]=rp[i,:,:]
 
-for i in np.append(np.arange(11), np.arange(15,21)):
-# for i in np.arange(21):
-    WriteOutput(alb_sph[i,:,:],    'albedo_spectral_spherical_'+str(i+1).zfill(2), InputFolder)
-    WriteOutput(rp[i,:,:],    'albedo_spectral_planar_'+str(i+1).zfill(2), InputFolder)
-    WriteOutput(refl[i,:,:],   'rBRR_'+str(i+1).zfill(2), InputFolder)
+    data_out.to_csv(sys.argv[1][:-4]+'_out.csv')
+# ========= input tif ===============
+elif os.path.isdir(sys.argv[1]):
+    WriteOutput(BXXX,   'O3_SICE',   InputFolder)
+    WriteOutput(D,      'grain_diameter',InputFolder)
+    WriteOutput(area,   'snow_specific_area', InputFolder)
+    WriteOutput(al,   'al',     InputFolder)
+    WriteOutput(r0,   'r0',InputFolder)
+    WriteOutput(isnow,'diagnostic_retrieval',InputFolder)
+    WriteOutput(conc, 'conc',InputFolder)
+    WriteOutput(rp3,  'albedo_bb_planar_sw',InputFolder)
+    WriteOutput(rs3,  'albedo_bb_spherical_sw',InputFolder)
+    
+    for i in np.append(np.arange(11), np.arange(15,21)):
+    # for i in np.arange(21):
+        WriteOutput(alb_sph[i,:,:],    'albedo_spectral_spherical_'+str(i+1).zfill(2), InputFolder)
+        WriteOutput(rp[i,:,:],    'albedo_spectral_planar_'+str(i+1).zfill(2), InputFolder)
+        WriteOutput(refl[i,:,:],   'rBRR_'+str(i+1).zfill(2), InputFolder)
 
 print("End SICE.py %s --- %s CPU seconds ---" % (InputFolder, time.process_time() - start_time))
