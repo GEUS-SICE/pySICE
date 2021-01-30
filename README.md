@@ -92,10 +92,10 @@ cd pySICE
 
 ## Examples
 
-Test input files are available [here](https://www.dropbox.com/s/9pb9n0k54ev3yg4/S3_test_data.zip?dl=0). Download and unzip using browser or with: 
+Test input files are available [here](https://www.dropbox.com/s/b7wbervqls0p5cc/S3_test_data.zip?dl=0). Download and unzip using browser or with: 
 
 ```
-wget https://www.dropbox.com/s/9pb9n0k54ev3yg4/S3_test_data.zip
+wget https://www.dropbox.com/s/b7wbervqls0p5cc/S3_test_data.zip
 unzip S3_test_data.zip -d S3_test_data
 ```
 
