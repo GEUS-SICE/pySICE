@@ -80,10 +80,9 @@ Update 07032019
 # quad_func                 calculation of quadratic parameters
 # funp                      snow spectral planar and spherical albedo function
  
-import numpy as np
 from constants import w, bai, xa, ya, f0, f1, f2, bet, gam, coef1, coef2, coef3, coef4
-
-#%% ================================================
+import numpy as np   
+# ================================================
 # tozon [i_channel]         spectral ozone vertical optical depth at the fixed ozone concentration 404.59DU ( wavelength, VOD)
 # voda[i_channel]           spectral water vapour vertical optical depth at the fixed concentration 3.847e+22 molecules per square sm
 
@@ -120,7 +119,7 @@ def molecular_absorption(ozone,tozon,sza,vza,toa):
         toa_cor_o3[i,:,:] = toa[i,:,:]*tvoda[i]*np.exp(inv_cos_za*tozon[i]*totadu/404.59)
     
     return BXXX, toa_cor_o3
-#%% viewing characteristics and aerosol properties
+# viewing characteristics and aerosol properties
 # sza                       solar zenith angle
 # vza                       viewing zenith angle
 # saa                       solar azimuthal angle
@@ -154,28 +153,31 @@ def view_geometry(vaa, saa, sza, vza, aot, height):
     cos_sa=-cos_sza*cos_vza + sin_sza*sin_vza*cos_raa
     
     return raa, cos_sza, cos_vza, ak1, ak2, inv_cos_za, cos_sa
-#%%     
+#     
 def aerosol_properties(aot, height, cos_sa):
-    # Atmospheric optical thickness
+    # aerosol optical thickness
     tauaer =aot*(w/0.5)**(-1.3)
 
     ad =height/7400.
     ak = height*0+1
-    ak[ad > 1.e-6]=np.exp(-ad[ad > 1.e-6])
+    #ak[ad > 1.e-6]=np.exp(-ad[ad > 1.e-6])
+    ak =np.exp(-height/7400)
     
     taumol = np.tile(height*np.nan, (21,1,1))
     tau = np.tile(height*np.nan, (21,1,1))
     g = np.tile(height*np.nan, (21,1,1))
     pa = np.tile(height*np.nan, (21,1,1))
     p = np.tile(height*np.nan, (21,1,1))
-    g0=0.5263
-    g1=0.4627
-    wave0=0.4685
-    gaer=g0+g1*np.exp(-w/wave0)
-    pr=0.75*(1.+cos_sa**2)
+	
+	# aerosol asymmetry parameter
+    gaer=0.5263+0.4627*np.exp(-w/0.4685)
+	
+	# phase function for molecular scattering
+    pmol=0.75*(1.+cos_sa**2)
     
     for i in range(21):
-        taumol[i,:,:] = ak*0.00877/w[i]**(4.05)
+		# molecular optical thickness
+        taumol[i,:,:] = ak*0.00877*w[i]**(-4.05)
         tau[i,:,:] = tauaer[i] + taumol[i,:,:]
     
         # aerosol asymmetry parameter
@@ -184,37 +186,47 @@ def aerosol_properties(aot, height, cos_sa):
         # HG phase function for aerosol
         pa[i,:,:]=(1-g[i,:,:]**2)/(1.-2.*g[i,:,:]*cos_sa+g[i,:,:]**2)**1.5
 
-        p[i,:,:]=(taumol[i,:,:]*pr + tauaer[i]*pa[i,:,:])/tau[i,:,:]
+        p[i,:,:]=(taumol[i,:,:]*pmol + tauaer[i]*pa[i,:,:])/tau[i,:,:]
     
     return tau, p, g, gaer,taumol,tauaer
 
-#%% snow properties
+# snow properties
 def snow_properties(toa, ak1, ak2):
         # retrieval of snow properties ( R_0, size of grains from OLCI channels 865[17] and 1020nm[21]
     # assumed not influenced by atmospheric scattering and absorption processes)                       
     
-    akap2=2.25e-6                    
-    alpha2=4.*np.pi*akap2/1.020                        
+	# imaginary part of the ice refractive index at 1020nm
+    akap2=2.25e-6   
+	# bulk absoprtion coefficient of ice at 1020nm	
+    alpha2=4.*np.pi*akap2/1.020 
+	# imaginary part of the ice refractive index at 865nm
+    # akap1=2.4e-7   
+	# bulk absoprtion coefficient of ice at 865nm	
+    # alpha1=4.*np.pi*akap1/0.865
+	
+	# eps = 1/(1-np.sqrt(alpha1/alpha2))
     eps = 1.549559365010611
-    
+	# consequently: 1-eps = 1/(1-np.sqrt(alpha2/alpha1))
+	
     # reflectivity of nonabsorbing snow layer 
     rr1=toa[16,:,:]   
     rr2=toa[20,:,:]
     r0 = (rr1**eps)*(rr2**(1.-eps))
                            
     # effective absorption length(mm)
-    bal = np.log(rr2/r0) * np.log(rr2/r0)/alpha2/(ak1*ak2/r0)**2
+    bal = (np.log(rr2/r0)/(ak1*ak2/r0))**2 /alpha2
     al = bal/1000.
     
     # effective grain size(mm):diameter
-    D=al/16.36              
+	# xi/(1-g) = 9.2
+    D=al/(9.2*16/9)              
     # snow specific area ( dimension: m*m/kg)
     area=   6./D/0.917
     return  D, area, al, r0, bal
 
-#%% =================================================
+# =================================================
 def prepare_coef(tau, g, p, cos_sza, cos_vza, inv_cos_za, gaer, taumol, tauaer):
-    astra=tau*np.nan
+    M=tau*np.nan
     rms=tau*np.nan
     t1=tau*np.nan
     t2=tau*np.nan
@@ -232,35 +244,45 @@ def prepare_coef(tau, g, p, cos_sza, cos_vza, inv_cos_za, gaer, taumol, tauaer):
     sssss=  (wa1-wa2)/(1.+bex)+wa2
 
     for i in range(21):
-        astra[i,:,:]=(1.-np.exp(-tau[i,:,:]*inv_cos_za))/(cos_sza+cos_vza)/4.
-        rms[i,:,:] = 1.- b1[i,:,:]*b2[i,:,:]/oskar[i,:,:]  \
-        + (3.*(1.+g[i,:,:])*cos_sza*cos_vza - 2.*(cos_sza+cos_vza))*astra[i,:,:]
-        #backscattering fraction
+        M[i,:,:]=(1.-np.exp(-tau[i,:,:]*inv_cos_za))/(cos_sza+cos_vza)/4.
+		
+		# multiple scattering contribution to the atmospheric reflectance
+        rms[i,:,:] = 1. \
+        + (3.*(1.+g[i,:,:])*cos_sza*cos_vza - 2.*(cos_sza+cos_vza))*M[i,:,:] \
+		- b1[i,:,:]*b2[i,:,:]/oskar[i,:,:] 
+		
+        # atmospheric backscattering fraction
+		# t1*t2 is the 2-ways atmospheric transmittance (from the sun to the surface and to the satellite)
         # t1[i,:,:] = np.exp(-(1.-g[i,:,:])*tau[i,:,:]/cos_sza/2.)
         # t2[i,:,:] = np.exp(-(1.-g[i,:,:])*tau[i,:,:]/cos_vza/2.)
-        t1[i,:,:]=np.exp(-(1.-g[i,:,:])*tau[i,:,:]/cos_sza/2./sssss[i,:,:])
-        t2[i,:,:]=np.exp(-(1.-g[i,:,:])*tau[i,:,:]/cos_vza/2./sssss[i,:,:])
-      
-    rss = p*astra
-    r = rss + rms
+        t1[i,:,:]=    np.exp(-(1.-g[i,:,:])/2./sssss[i,:,:]/cos_sza*tau[i,:,:])
+        t2[i,:,:]=    np.exp(-(1.-g[i,:,:])/2./sssss[i,:,:]/cos_vza*tau[i,:,:])
     
-    # SALBED
-#    ratm = salbed(tau, g)
+	# Single scattering contribution to the atmospheric reflectance
+    rss = p*M
+	# Atmospheric reflectance
+    r = rss + rms
+    return t1, t2, r, M, rms
+
+def atm_spher_alb(tau, g):
+    # SALBED ratm = salbed(tau, g)
+	# parameterization of atmospheric spherical albedo by Kokhanovsky et al. (2005, doi: 10.1016/j.atmosres.2004.07.004)
     a_s = (.18016,  -0.18229,  0.15535,     -0.14223)
     bs = (.58331,  -0.50662,  -0.09012,        0.0207)
     cs = (0.21475,   -0.1,  0.13639,            -0.21948)
     als = (0.16775, -0.06969,  0.08093,     -0.08903)
     bets = (1.09188,  0.08994,  0.49647,   -0.75218)
     
-    a_cst =     a_s[0]*g**0  + a_s[1]*g**1 + a_s[2]*g**2 + a_s[3]*g**3
-    b_cst =     bs[0]*g**0   + bs[1]*g**1 + bs[2]*g**2 + bs[3]*g**3
-    c_cst =     cs[0]*g**0   + cs[1]*g**1 + cs[2]*g**2 + cs[3]*g**3
-    al_cst=     als[0]*g**0  + als[1]*g**1 + als[2]*g**2 + als[3]*g**3
-    bet_cst=    bets[0]*g**0 + bets[1]*g**1 + bets[2]*g**2 + bets[3]*g**3        
+    a_cst =     a_s[0]  + a_s[1]*g**1 + a_s[2]*g**2 + a_s[3]*g**3
+    b_cst =     bs[0]   + bs[1]*g**1 + bs[2]*g**2 + bs[3]*g**3
+    c_cst =     cs[0]   + cs[1]*g**1 + cs[2]*g**2 + cs[3]*g**3
+    al_cst=     als[0]  + als[1]*g**1 + als[2]*g**2 + als[3]*g**3
+    bet_cst=    bets[0] + bets[1]*g**1 + bets[2]*g**2 + bets[3]*g**3        
    
     ratm = tau*(a_cst*np.exp(-tau/al_cst)+b_cst*np.exp(-tau/bet_cst)+c_cst)
-    return t1, t2, ratm, r, astra, rms
-#%% snow_imputirities
+    return ratm
+	
+# snow_imputirities
 def snow_impurities(alb_sph, bal):
         # analysis of snow impurities
     # ( the concentrations below 0.0001 are not reliable )        
@@ -303,7 +325,7 @@ def snow_impurities(alb_sph, bal):
     return ntype, bf, conc
 
     
-#%% ===========================================================================
+# ===========================================================================
 def alb2rtoa(a, t1, t2, r0, ak1, ak2, ratm, r):
 # Function that calculates the theoretical reflectance from a snow spherical albedo a
 # This function can then be solved to find optimal snow albedo
@@ -317,7 +339,7 @@ def alb2rtoa(a, t1, t2, r0, ak1, ak2, ratm, r):
     rs=r + surf
     return rs
 
-#%% ===========================================================================
+# ===========================================================================
 def salbed(tau, g):
     # WARNING: NOT USED ANYMORE
     # SPHERICAL ALBEDO OF TERRESTRIAL ATMOSPHERE:      
@@ -343,7 +365,7 @@ def salbed(tau, g):
     return salbed
 
 
-#%% =====================================================================
+# =====================================================================
 def zbrent(f, x0, x1, max_iter=100, tolerance=1e-6):
     # Equation solver using Brent's method
     # https://en.wikipedia.org/wiki/Brent%27s_method
@@ -415,7 +437,7 @@ def zbrent(f, x0, x1, max_iter=100, tolerance=1e-6):
  
     return x1
 
-#%% =====================================================================     
+# =====================================================================     
 def funp(x, al, sph_calc, ak1):
     #     Spectral planar albedo
     # Inputs:
@@ -450,7 +472,7 @@ def funp(x, al, sph_calc, ak1):
      
     return rs*funcs
 
-#%% Approximation functions for BBA integration
+# Approximation functions for BBA integration
 def plane_albedo_sw_approx(D,cos_sza):
     anka= 0.7389  -0.1783*cos_sza    +0.0484*cos_sza**2.
     banka=0.0853  +0.0414*cos_sza    -0.0127*cos_sza**2.
@@ -467,7 +489,7 @@ def spher_albedo_sw_approx(D):
     diam2=2448.18
     return anka+banka*np.exp(-1000*D/diam1)+canka*np.exp(-1000*D/diam2)
 
-#%%   CalCULATION OF BBA for clean pixels
+#   CalCULATION OF BBA for clean pixels
 def BBA_calc_clean(al, ak1):
     # for clean snow
     # plane albedo
@@ -498,7 +520,7 @@ def BBA_calc_clean(al, ak1):
     # END of clean snow bba calculation
     return p1,p2,s1,s2            
 
-#%% ===============================
+# ===============================
 def qsimp(func,a,b):
     # integrate function between a and b using simpson's method. 
     # works as fast as scipy.integrate quad
@@ -530,7 +552,7 @@ def qsimp(func,a,b):
     print("Max iteration reached")
     return s
 
-#%% Calculation f BBA for polluted snow
+# Calculation f BBA for polluted snow
 
 def BBA_calc_pol(alb, asol, sol1_pol, sol2, sol3_pol):
     # polluted snow
@@ -598,7 +620,7 @@ def BBA_calc_pol(alb, asol, sol1_pol, sol2, sol3_pol):
 
     return BBA_vis,BBA_nir, BBA_sw
 
-#%% ==========================================================================
+# ==========================================================================
 def quad_func(x0,x1,x2,y0,y1,y2):
     # quadratic function used for the polluted snow BBA calculation
     # see BBA_calc_pol

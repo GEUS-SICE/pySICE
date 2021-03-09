@@ -34,9 +34,8 @@ print(sys.argv[1])
 
 #%% input text file
 if os.path.isfile(sys.argv[1]):  
-    InputFolder = os.path.dirname(os.path.dirname(sys.argv[1]))+'/'
-    print('\nText file input')
-    # data_in = pd.read_csv(sys.argv[1])
+    InputFolder = os.path.dirname(sys.argv[1])+'/'
+    # data_in = pd.read_csv('validation/data/S3_PROMICE.csv')
     data_in = pd.read_csv(sys.argv[1])
     toa = np.expand_dims(data_in[[c for c in data_in.columns if c.find('reflec')>=0]].to_numpy().transpose(), axis=2)
     
@@ -117,7 +116,6 @@ np.savetxt(OutputFolder+'olci_toa_newformat.dat', X=olci_toa, delimiter='\t', \
 # print('bash ./fortran/sice_f.sh -i '+OutputFolder)
 # os.system('bash ./fortran/sice_f.sh -i '+OutputFolder)
 
-
 cmnd = 'bash ./fortran/sice_f.sh -i '+OutputFolder
 print(cmnd)
 import subprocess
@@ -142,9 +140,7 @@ else:
 #  file=   'notsnow.dat')                   ns,ndate(3),icloud,iice
 #  file='retrieved_O3.dat')                 ns,alat,alon,BXXX,totadu,deltak,sza,vza,amf
 
-if os.path.isfile(sys.argv[1]):  
-    print('\nText file output')
-    
+if os.path.isfile(sys.argv[1]):     
     impurity = pd.read_csv(OutputFolder+'impurity.dat', 
                            names=['ns','ndate','alat','alon','ntype','conc',
                                   'bf','bm','thv', 'toa(1)','isnow'], 
@@ -156,27 +152,41 @@ if os.path.isfile(sys.argv[1]):
     bba = pd.read_csv(OutputFolder+'bba.dat', 
                            names=['ns','ndate','alat','alon','rp3','rs3','isnow'], 
                                    sep=' ', skipinitialspace=True, header=None)  
-    data_out = data_in
-    data_out['grain_diameter']=np.nan
-    data_out.loc[size.ns-1, ['grain_diameter']]=size.D
-    data_out['snow_specific_area']=np.nan
-    data_out.loc[size.ns-1,['snow_specific_area']]=size.area
-    data_out['al']=np.nan
-    data_out.loc[size.ns-1,['al']]=size.al
-    data_out['r0']=np.nan
-    data_out.loc[size.ns-1,['r0']]=size.r0
-    data_out['diagnostic_retrieval']=np.nan
-    data_out.loc[size.ns-1,['diagnostic_retrieval']]=bba.isnow
-    data_out['conc']=np.nan
-    data_out.loc[size.ns-1,['conc']]=impurity.conc
-    data_out['albedo_bb_planar_sw']=np.nan
-    data_out.loc[size.ns-1,['albedo_bb_planar_sw']]=bba.rp3
-    data_out['albedo_bb_spherical_sw']=np.nan
-    data_out.loc[size.ns-1,['albedo_bb_spherical_sw']]=bba.rs3
     spherical_albedo = pd.read_csv(OutputFolder+'spherical_albedo.dat', 
                                    sep=' ', skipinitialspace=True, header=None).values
     planar_albedo = pd.read_csv(OutputFolder+'planar_albedo.dat', 
                                    sep=' ', skipinitialspace=True, header=None).values
+
+    data_out = data_in
+    data_out['grain_diameter']=np.nan
+    data_out['snow_specific_area']=np.nan
+    data_out['al']=np.nan
+    data_out['r0']=np.nan
+    data_out['diagnostic_retrieval']=np.nan
+    data_out['conc']=np.nan
+    data_out['albedo_bb_planar_sw']=np.nan
+    data_out['albedo_bb_spherical_sw']=np.nan
+
+    data_out['grain_diameter'][size.ns-1] = size.D
+    # data_out.loc[size.ns-1, ['grain_diameter']]=size.D
+    data_out.loc[size.ns-1,['snow_specific_area']]=size.area
+    data_out.loc[size.ns-1,['al']]=size.al
+    data_out.loc[size.ns-1,['r0']]=size.r0
+    data_out.loc[size.ns-1,['diagnostic_retrieval']]=bba.isnow
+    data_out.loc[size.ns-1,['conc']]=impurity.conc
+    data_out['albedo_bb_planar_sw'][size.ns-1]=bba.rp3
+    data_out['albedo_bb_spherical_sw']=np.nan
+    data_out['albedo_bb_spherical_sw'][size.ns-1]=bba.rs3
+
+    # data_out.iloc[size.ns-1, data_out.columns.get_loc('grain_diameter')]=size.D
+    # data_out.iloc[size.ns-1, data_out.columns.get_loc('snow_specific_area')]=size.area
+    # data_out.iloc[size.ns-1, data_out.columns.get_loc('al')]=size.al
+    # data_out.iloc[size.ns-1, data_out.columns.get_loc('r0')]=size.r0
+    # data_out.iloc[size.ns-1, data_out.columns.get_loc('diagnostic_retrieval')]=bba.isnow
+    # data_out.iloc[size.ns-1, data_out.columns.get_loc('conc')]=impurity.conc
+    # data_out.iloc[size.ns-1, data_out.columns.get_loc('albedo_bb_planar_sw')]=bba.rp3
+    # data_out.iloc[size.ns-1, data_out.columns.get_loc('albedo_bb_spherical_sw')]=bba.rs3
+    
 
     for i in np.append(np.arange(11), np.arange(15,21)):
     # for i in np.arange(21):
@@ -188,6 +198,8 @@ if os.path.isfile(sys.argv[1]):
         data_out.loc[size.ns-1,['rBRR_'+str(i+1).zfill(2)]]=planar_albedo[:,4+i]
 
     data_out.to_csv(sys.argv[1][:-4]+'_fortran_out.csv')
+    print('\nOutput: '+ sys.argv[1][:-4] + '_fortran_out.csv')
+
 # ========= input tif ===============
 elif os.path.isdir(sys.argv[1]):
     Oa01 = rio.open(InputFolder+'r_TOA_01.tif')
