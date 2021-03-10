@@ -91,13 +91,16 @@ if __name__ == '__main__':
     InputPath = sys.argv[1]
     if len(sys.argv)>1:
         OutputFolder = sys.argv[2]
-        os.mkdir(OutputFolder)
+        try: 
+            os.makedirs(OutputFolder)
+        except:
+            pass
     else:
         OutputFolder = os.path.dirname(InputPath) + '/'
         
     pySICE(InputPath,OutputFolder)
     
-def pySICE(InputPath, OutputFolder, olci_gains = False):
+def pySICE(InputPath, OutputFolder, olci_gains = False, slopey = False):
     pySICE_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
     print(pySICE_dir)
     # script directory
@@ -126,7 +129,7 @@ def pySICE(InputPath, OutputFolder, olci_gains = False):
         vza[np.isnan(toa[0,:,:])] = np.nan
         vaa[np.isnan(toa[0,:,:])] = np.nan   
     
-    # %%  input tif 
+    # %% input tif 
     elif os.path.isdir(InputPath):
         InputFolder =  InputPath + '/'
         print("\nTiff files input")  
@@ -150,7 +153,14 @@ def pySICE(InputPath, OutputFolder, olci_gains = False):
             
         ozone = rio.open(InputFolder+'O3.tif').read(1)
         # water = rio.open(InputFolder+'WV.tif').read(1)
-        sza = rio.open(InputFolder+'SZA.tif').read(1)
+        
+        if slopey:
+            sza = rio.open(InputFolder+'SZA_eff.tif').read(1)
+            vza = rio.open(InputFolder+'OZA_eff.tif').read(1)
+        else:
+            toa[16,:,:] = rio.open((InputFolder+'ir_TOA_17.tif')).read(1)
+            toa[20,:,:] = rio.open((InputFolder+'ir_TOA_21.tif')).read(1)
+
         saa = rio.open(InputFolder+'SAA.tif').read(1)
         vza = rio.open(InputFolder+'OZA.tif').read(1)
         vaa = rio.open(InputFolder+'OAA.tif').read(1)
@@ -174,6 +184,7 @@ def pySICE(InputPath, OutputFolder, olci_gains = False):
     if olci_gains:
         gains = pd.read_csv(pySICE_dir+'/misc/gains_olci.csv').average_gain.values
         toa = toa*gains.reshape([-1,  1,  1])
+        
     
     #%%   declaring variables
     BXXX, isnow, D, area, al, r0, isnow, conc, ntype, rp1, rp2, rp3, rs1, rs2, rs3 =   vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan,  vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan, vaa*np.nan
