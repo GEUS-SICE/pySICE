@@ -1,4 +1,4 @@
-# pySICEv1.4
+# pySICEv1.5
 # 
 # from FORTRAN VERSION 5.2
 # March 31, 2020
@@ -91,16 +91,15 @@ if __name__ == '__main__':
     InputPath = sys.argv[1]
     if len(sys.argv)>1:
         OutputFolder = sys.argv[2]
-        try: 
-            os.makedirs(OutputFolder)
-        except:
-            pass
     else:
         OutputFolder = os.path.dirname(InputPath) + '/'
         
     pySICE(InputPath,OutputFolder)
-    
+# InputPath = 'C:/Data_save/SICE/mosaics_masked/2017-07-13'
+# OutputFolder = 'out/test'
 def pySICE(InputPath, OutputFolder, olci_gains = False, slopey = False):
+    os.makedirs(OutputFolder,exist_ok=True)
+        
     pySICE_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
     print(pySICE_dir)
     # script directory
@@ -157,12 +156,13 @@ def pySICE(InputPath, OutputFolder, olci_gains = False, slopey = False):
         if slopey:
             sza = rio.open(InputFolder+'SZA_eff.tif').read(1)
             vza = rio.open(InputFolder+'OZA_eff.tif').read(1)
-        else:
             toa[16,:,:] = rio.open((InputFolder+'ir_TOA_17.tif')).read(1)
             toa[20,:,:] = rio.open((InputFolder+'ir_TOA_21.tif')).read(1)
+        else:
+            sza = rio.open(InputFolder+'SZA.tif').read(1)
+            vza = rio.open(InputFolder+'OZA.tif').read(1)
 
         saa = rio.open(InputFolder+'SAA.tif').read(1)
-        vza = rio.open(InputFolder+'OZA.tif').read(1)
         vaa = rio.open(InputFolder+'OAA.tif').read(1)
         height = rio.open(InputFolder+'height.tif').read(1)
         
@@ -215,7 +215,7 @@ def pySICE(InputPath, OutputFolder, olci_gains = False, slopey = False):
     #%% snow properties
     D, area, al, r0, bal = sl.snow_properties(toa_cor_o3, ak1, ak2)
     # filtering small D
-    D_thresh = 0.1
+    D_thresh = 0.05
     isnow[np.logical_and(D<D_thresh, np.isnan(isnow))] = 104
     
     for i in range(21):
