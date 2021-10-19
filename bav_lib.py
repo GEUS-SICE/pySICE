@@ -22,6 +22,43 @@ years = mdates.YearLocator()   # every year
 months = mdates.MonthLocator()  # every month
 years_fmt = mdates.DateFormatter('%Y')
 
+#%% 
+from math import radians, cos, sin, asin, sqrt
+def haversine(lat1, lon1, lat2, lon2, to_radians=True, earth_radius=6371):
+    """
+    slightly modified version: of http://stackoverflow.com/a/29546836/2901002
+
+    Calculate the great circle distance between two points
+    on the earth (specified in decimal degrees or in radians)
+
+    All (lat, lon) coordinates must have numeric dtypes and be of equal length.
+
+    """
+    if to_radians:
+        lat1, lon1, lat2, lon2 = np.radians([lat1, lon1, lat2, lon2])
+
+    a = np.sin((lat2-lat1)/2.0)**2 + \
+        np.cos(lat1) * np.cos(lat2) * np.sin((lon2-lon1)/2.0)**2
+
+    return earth_radius * 2 * np.arcsin(np.sqrt(a))
+    
+# %% 
+def stat_title(x,y,ax):
+    ind = np.logical_and(pd.notnull(x),pd.notnull(y))
+    x = x[ind]
+    y=y[ind]
+    x = x.values.reshape(-1,1)
+    y = y.values.reshape(-1,1)    
+
+    lr = linear_model.LinearRegression()
+    lr.fit(x,y)
+    # print('Coefficients: \n', lr.coef_)    
+    preds = lr.predict(x)
+    ax.set_title('R2=%.3f\nRMSE=%.2f\nN=%.0f' % (r2_score(y,preds),
+                                              mean_squared_error(y,preds), 
+                                              len(x)))
+    return ax
+  #%% 
 def multi_plot(data_out, 
                sites = ['KAN_M', 'KAN_U'],sp1 = 4, sp2 = 2,
                title = '', OutputFolder='figures/',
@@ -267,5 +304,36 @@ def mosaic_albedo_fit(df, Rad_in):
             ax[i, j].set_ylim([0.01, 1.05])
             ax[i, j].grid(True)
     fig.savefig('./output/linear_'+Rad_in+'oa.png',bbox_inches='tight')
+#%% 
+def overall_axis_label(fig, xlab, ylab):
+    ax0 = fig.add_subplot(111)    # The big subplot
+    
+    # Turn off axis lines and ticks of the big subplot
+    ax0.spines['top'].set_color('none')
+    ax0.spines['bottom'].set_color('none')
+    ax0.spines['left'].set_color('none')
+    ax0.spines['right'].set_color('none')
+    ax0.tick_params(labelcolor='w', top=False, bottom=False, left=False, right=False)
+    ax0.patch.set_visible(False)
+   
+    # Set common labels
+    ax0.set_xlabel('Date')
+    
+    if isinstance(ylab,str):
+        ax0.set_ylabel(ylab)
+        ax0_2 = []
+    else 
+        ax0.set_ylabel(ylab[0])
 
+        ax0_2 = ax0.twinx()  
+        ax0_2.set_ylabel(ylab[1])
+    
+        ax0_2.spines['top'].set_color('none')
+        ax0_2.spines['bottom'].set_color('none')
+        ax0_2.spines['left'].set_color('none')
+        ax0_2.spines['right'].set_color('none')
+        ax0_2.tick_params(labelcolor='w', top=False, bottom=False, left=False, right=False)
+        
+        ax0_2.patch.set_visible(False)
+    return ax0, ax0_2
 
