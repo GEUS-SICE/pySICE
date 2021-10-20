@@ -48,7 +48,7 @@
 # area                      specific surface area (kg/m/m)
 # al                        effective absorption length(mm)
 # r0                        reflectance of a semi-infinite non-absorbing snow layer
-#
+
 # plane BroadBand Albedo (BBA)
 # rp1                       visible(0.3-0.7micron)
 # rp2                       near-infrared (0.7-2.4micron)
@@ -73,7 +73,7 @@
 # quad_func                 calculation of quadratic parameters
 # trapzd                    trapezoidal rule for integral calculation
 # funp                      snow spectral planar and spherical albedo function
-# ====================================
+#	====================================
 
 import numpy as np
 from numpy import genfromtxt
@@ -423,4 +423,3 @@ if __name__ == '__main__':
     print(OutputFolder)
     print('---')
     pySICE(InputPath,OutputFolder)
-
