@@ -918,7 +918,7 @@ def prepare_coef(tau, g, p, cos_sza, cos_vza, inv_cos_za):  # , gaer, taumol, ta
         b_cst += bs[n] * gg
         c_cst += cs[n] * gg
         al_cst += als[n] * gg
-        bet_cst += bets[n] + gg
+        bet_cst += bets[n] * gg
     del gg
 
     ratm = tau * (a_cst * np.exp(-tau / al_cst) + b_cst * np.exp(-tau / bet_cst) + c_cst)
@@ -987,7 +987,7 @@ def prepare_coef_numpy(tau, g, p, cos_sza, cos_vza, inv_cos_za):  # , gaer, taum
         b_cst += bs[n] * gg
         c_cst += cs[n] * gg
         al_cst += als[n] * gg
-        bet_cst += bets[n] + gg
+        bet_cst += bets[n] * gg
     del gg
 
     ratm = tau * (a_cst * np.exp(-tau / al_cst) + b_cst * np.exp(-tau / bet_cst) + c_cst)
