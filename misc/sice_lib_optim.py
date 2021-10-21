@@ -87,6 +87,7 @@ from glob import glob
 import xarray as xr
 import netCDF4
 import numpy as np
+import rioxarray
 
 try:
     import rasterio as rio
@@ -98,8 +99,8 @@ os.environ['PYTROLL_CHUNK_SIZE'] = '256'
 
 import numba
 
-from .constants_optim import wls, bai, xa, ya, f0, f1, f2, bet, gam, coef1, coef2, coef3, coef4
-from .constants_optim import sol1_clean, sol2, sol3_clean, sol1_pol, sol3_pol, asol, bandcoord
+from constants_optim import wls, bai, xa, ya, f0, f1, f2, bet, gam, coef1, coef2, coef3, coef4
+from constants_optim import sol1_clean, sol2, sol3_clean, sol1_pol, sol3_pol, asol, bandcoord
 
 
 # %% ================================================
@@ -169,7 +170,8 @@ class SICEProcessor(object):
         def read_tif(filename):
             chunks = None
             chunks = 'auto'
-            data = xr.open_rasterio(os.path.join(self.dirname, filename), chunks=chunks).squeeze(dim='band', drop=True)
+            # data = xr.open_rasterio(os.path.join(self.dirname, filename), chunks=chunks).squeeze(dim='band', drop=True)
+            data = rioxarray.open_rasterio(os.path.join(self.dirname, filename), chunks=chunks).squeeze(dim='band', drop=True)
 
             if width is not None:
                 data = data.isel(x=slice(x0, x0 + width))
@@ -183,8 +185,17 @@ class SICEProcessor(object):
 
         self.toa = []
         for i in range(21):
-            dat = read_tif(f'r_TOA_{i + 1:02}.tif')
+            try:
+                dat = read_tif(f'r_TOA_{i + 1:02}.tif')
+            except:
+                if i in [16, 20]:
+                    raise Exception('Missing the necessary bands')
+                else:
+                    print('Cannot load ','r_TOA_'+str(i+1).zfill(2)+'.tif, replacing by nans')
+                    dat = xr.full_like(self.toa[0],fill_value=np.nan)
+                
             self.toa.append(dat)
+        # self.toa = xr.concat(self.toa, dim=xr.Variable('band', np.arange(21)))
         self.toa = xr.concat(self.toa, dim='band')
         print("toa=", self.toa.coords)
 
@@ -196,8 +207,8 @@ class SICEProcessor(object):
         self.vaa = read_tif('OAA.tif')
         self.elevation = read_tif('height.tif').astype(np.float64)
 
-        self.latitude = read_tif('lat.tif')
-        self.longitude = read_tif('lon.tif')
+        # self.latitude = read_tif('lat.tif')
+        # self.longitude = read_tif('lon.tif')
 
         mask = ~np.isnan(self.toa.sel(band=0))
         self.sza = self.sza.where(mask)
@@ -228,9 +239,9 @@ class SICEProcessor(object):
             'satellite_azimuth_angle': 'vaa',
             'satellite_zenith_angle': 'vza',
             'total_ozone': 'ozone',
-            'altitude': 'elevation',
-            'longitude': 'longitude',
-            'latitude': 'latitude'
+            'altitude': 'elevation'
+            # 'longitude': 'longitude',
+            # 'latitude': 'latitude'
         }
         scene.load(list(variables.keys()))
 
@@ -279,9 +290,9 @@ class SICEProcessor(object):
             'satellite_azimuth_angle': 'vaa',
             'satellite_zenith_angle': 'vza',
             'total_ozone': 'ozone',
-            'altitude': 'elevation',
-            'longitude': 'longitude',
-            'latitude': 'latitude'
+            'altitude': 'elevation'
+            # 'longitude': 'longitude',
+            # 'latitude': 'latitude'
         }
 
         ds = xr.open_zarr(self.dirname)
@@ -323,6 +334,7 @@ class SICEProcessor(object):
         tozon = xr.DataArray(ozone_vod[0:21, 1], coords=[bandcoord])
 
         # %% =========== ozone scattering  ====================================
+
         BXXX, self.toa = molecular_absorption(self.ozone, tozon, self.sza, self.vza, self.toa)
         del self.ozone  # don't use anymore
 
@@ -565,11 +577,11 @@ class SICEProcessor(object):
         write_output(6 / 0.917 / self.diameter, 'snow_specific_area', self.dirname, self.meta)
         write_output(self.rp3, 'albedo_bb_planar_sw', self.dirname, self.meta)
         write_output(self.rs3, 'albedo_bb_spherical_sw', self.dirname, self.meta)
-        write_output(self.longitude, 'longitude', self.dirname, self.meta)
-        write_output(self.latitude, 'latitude', self.dirname, self.meta)
+        # write_output(self.longitude, 'longitude', self.dirname, self.meta)
+        # write_output(self.latitude, 'latitude', self.dirname, self.meta)
 
         if isinstance(self.isnow, np.ndarray):
-            self.isnow = xr.DataArray(self.isnow, coords=self.longitude.coords)
+            self.isnow = xr.DataArray(self.isnow, coords=self.sza.coords)
         write_output(self.isnow, 'diagnostic_retrieval', self.dirname, self.meta)
 
         if extended_output:
@@ -591,9 +603,9 @@ class SICEProcessor(object):
 
         ds = xr.Dataset({'snow_specific_area': 6 / 0.917 / self.diameter.unstack(dim='xy'),
                          'albedo_bb_planar_sw': self.rp3.unstack(dim='xy'),
-                         'albedo_bb_spherical_sw': self.rs3.unstack(dim='xy'),
-                         'longitude': self.longitude.unstack(dim='xy'),
-                         'latitude': self.latitude.unstack(dim='xy')})
+                         'albedo_bb_spherical_sw': self.rs3.unstack(dim='xy')})#,
+                         # 'longitude': self.longitude.unstack(dim='xy'),
+                         # 'latitude': self.latitude.unstack(dim='xy')})
 
         if append_dim:
             mode = 'a'
@@ -667,9 +679,10 @@ def write_output(var, var_name, in_folder, meta):
     # this functions write tif files based on a model file, here "Oa01"
     # opens a file for writing
 
-    var = var.unstack(dim='xy')
-    with rio.open(os.path.join(in_folder, var_name + '.tif'), 'w+', **meta) as dst:
-        dst.write(var.astype('float32'), 1)
+    var = var.unstack(dim='xy').transpose('y', 'x')
+    var.rio.to_raster(os.path.join(in_folder, var_name + '.tif'))
+    # with rio.open(os.path.join(in_folder, var_name + '.tif'), 'w+', **meta) as dst:
+    #     dst.write(var.astype('float32'), 1)
 
 
 def molecular_absorption(ozone, tozon, sza, vza, toa):
