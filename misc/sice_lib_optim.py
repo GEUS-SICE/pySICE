@@ -849,83 +849,18 @@ def prepare_coef_orig(tau, g, p, cos_sza, cos_vza, inv_cos_za):  # , gaer, taumo
 
 
 def prepare_coef(tau, g, p, cos_sza, cos_vza, inv_cos_za):  # , gaer, taumol, tauaer):
+
+    otherdims = tuple([d for d in tau.dims if d != 'band'])
+    inputdims = [('band',) + otherdims] * 3 + [otherdims] * 3
+    outputdims = [('band',) + otherdims] * 4
+
     args = tau, g, p, cos_sza, cos_vza, inv_cos_za  # , gaer, taumol, tauaer
-
-    dims = [a.dims for a in args]
-    dims = [('band', 'xy', )] * 3 + [('xy', )] * 3
-    return xr.apply_ufunc(prepare_coef_numpy, *args, input_core_dims=dims, output_core_dims=[('band', 'xy')]*4)
-
-
-#def prepare_coef_numpy(tau, g, p, cos_sza, cos_vza, inv_cos_za):  # , gaer, taumol, tauaer):
-def prepare_coef(tau, g, p, cos_sza, cos_vza, inv_cos_za):  # , gaer, taumol, tauaer):
-
-    one_g_tau = (1 - g) * tau
-
-    # SOBOLEV
-    b1 = 1. + 1.5 * cos_sza + (1. - 1.5 * cos_sza) * np.exp(-tau / cos_sza)
-    b2 = 1. + 1.5 * cos_vza + (1. - 1.5 * cos_vza) * np.exp(-tau / cos_vza)
-
-    sumcos = cos_sza + cos_vza
-
-    astra = (1. - np.exp(- tau * inv_cos_za)) / sumcos / 4.
-    oskar = 4. + 3. * one_g_tau
-    rms = 1. - b1 * b2 / oskar + (3. * (1. + g) * (cos_sza * cos_vza) - 2. * sumcos) * astra
-
-    del sumcos
-
-    #rss = p * astra
-    r = p * astra + rms
-
-    del rms
-    del p
-
-    wa1 = 1.10363
-    wa2 = -6.70122
-    wx0 = 2.19777
-    wdx = 0.51656
-    bex = np.exp((g - wx0) / wdx)
-    #sssss = (wa1 - wa2) / (1. + bex) + wa2
-
-    # backscattering fraction
-    arg = - 0.5 * one_g_tau / ((wa1 - wa2) / (1. + bex) + wa2)
-
-    del bex
-    del one_g_tau
-
-    t1 = np.exp(arg / cos_sza)
-    t2 = np.exp(arg / cos_vza)
-
-    # SALBED
-    #    ratm = salbed(tau, g)
-    a_s = (.18016, -0.18229, 0.15535, -0.14223)
-    bs = (.58331, -0.50662,  -0.09012, 0.0207)
-    cs = (0.21475, -0.1, 0.13639, -0.21948)
-    als = (0.16775, -0.06969, 0.08093, -0.08903)
-    bets = (1.09188, 0.08994, 0.49647, -0.75218)
-
-    a_cst = a_s[0] + a_s[1] * g
-    b_cst = bs[0] + bs[1] * g
-    c_cst = cs[0] + cs[1] * g
-    al_cst = als[0] + als[1] * g
-    bet_cst = bets[0] + bets[1] * g
-
-    for n in range(2, 4):
-        if n == 2:
-            gg = g ** 2
-        else:
-            gg *= g
-        a_cst += a_s[n] * gg
-        b_cst += bs[n] * gg
-        c_cst += cs[n] * gg
-        al_cst += als[n] * gg
-        bet_cst += bets[n] * gg
-    del gg
-
-    ratm = tau * (a_cst * np.exp(-tau / al_cst) + b_cst * np.exp(-tau / bet_cst) + c_cst)
+    t1, t2, ratm, r = xr.apply_ufunc(prepare_coef_numpy, *args, input_core_dims=inputdims, output_core_dims=outputdims)
 
     return t1, t2, ratm, r   # used to also return: , astra, rms
 
 
+@numba.jit(nopython=True, cache=True)
 def prepare_coef_numpy(tau, g, p, cos_sza, cos_vza, inv_cos_za):  # , gaer, taumol, tauaer):
 
     one_g_tau = (1 - g) * tau
@@ -940,26 +875,24 @@ def prepare_coef_numpy(tau, g, p, cos_sza, cos_vza, inv_cos_za):  # , gaer, taum
     oskar = 4. + 3. * one_g_tau
     rms = 1. - b1 * b2 / oskar + (3. * (1. + g) * (cos_sza * cos_vza) - 2. * sumcos) * astra
 
-    del sumcos
+    #del sumcos
 
-    #rss = p * astra
     r = p * astra + rms
 
-    del rms
-    del p
+    #del rms
+    #del p
 
     wa1 = 1.10363
     wa2 = -6.70122
     wx0 = 2.19777
     wdx = 0.51656
     bex = np.exp((g - wx0) / wdx)
-    #sssss = (wa1 - wa2) / (1. + bex) + wa2
 
     # backscattering fraction
     arg = - 0.5 * one_g_tau / ((wa1 - wa2) / (1. + bex) + wa2)
 
-    del bex
-    del one_g_tau
+    #del bex
+    #del one_g_tau
 
     t1 = np.exp(arg / cos_sza)
     t2 = np.exp(arg / cos_vza)
@@ -988,9 +921,10 @@ def prepare_coef_numpy(tau, g, p, cos_sza, cos_vza, inv_cos_za):  # , gaer, taum
         c_cst += cs[n] * gg
         al_cst += als[n] * gg
         bet_cst += bets[n] * gg
-    del gg
+    #del gg
 
     ratm = tau * (a_cst * np.exp(-tau / al_cst) + b_cst * np.exp(-tau / bet_cst) + c_cst)
+
     return t1, t2, ratm, r   # used to also return: , astra, rms
 
 # %% snow_imputirities
