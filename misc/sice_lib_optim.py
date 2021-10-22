@@ -319,7 +319,7 @@ class SICEProcessor(object):
     def view_geometry(self):
 
         # =========== view geometry propeties  ==============
-        aot = 1
+        aot = 0.1
 
         self.cos_sza, self.cos_vza, self.ak1, self.ak2, self.inv_cos_za, self.cos_sa = \
             view_geometry(self.vaa, self.saa, self.sza, self.vza, aot, self.elevation)
@@ -359,7 +359,7 @@ class SICEProcessor(object):
     def aerosol_properties(self):
         # =========== atmosphere propeties  ==============
         #print('compute aerosol_properties')
-        aot = 1
+        aot = 0.1
         self.tau, self.p, self.g = aerosol_properties(aot, self.elevation, self.cos_sa)   # use to return , gaer, taumol, tauaer
 
     def snow_properties(self):
@@ -368,7 +368,7 @@ class SICEProcessor(object):
         self.diameter, self.al, self.r0, self.bal = snow_properties(self.toa, self.ak1, self.ak2)
 
         # filtering small D
-        diameter_thresh = 0.1
+        diameter_thresh = 0.01
 
         valid = self.diameter >= diameter_thresh
 
