@@ -5,7 +5,8 @@
 c***********************************************      
 c                  A. KOKHANOVSKY       
 c                  RETRIEVAL OF SNOW PROPERTIES
-c                  USING OLCI     
+c                  USING OLCI
+c				   version 6.0     
 c                  a.a.kokhanovsky@gmail.com
 c                  April 15, 2022               
 c***********************************************
