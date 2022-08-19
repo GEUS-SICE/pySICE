@@ -47,7 +47,7 @@ The Algorithm Theoretical Basis Document is available [here](docs/atbd/FINAL_SIC
 ### Scripts overview
 ![](docs/atbd/ATBD_plots1.png)
 
-### Input preparation
+### Input needed
 
 Input files:
 |File |Description|
@@ -61,6 +61,42 @@ Input files:
 | SZA.tif  | Solar Zenith angle|
 | SAA.tif  | Solar azimuth angle|
 | WV.tif  | Water vapor|
+
+### Outputs
+
+| File Name                            | Description                                                            | Units       |
+|--------------------------------------+------------------------------------------------------------------------+-------------|
+| grain_diameter.tif                   | Snow grain diameter                                                    | mm          |
+| snow_specific_surface_area.tif       | Snow specific surface area                                             | m^{2}kg^{-1}|
+| albedo_bb_planar_nir.tif             | near infrared broadband planar albedo                                  | 700-2400 nm |
+| albedo_bb_planar_sw.tif              | shortwave broadband planar albedo                                      | 300-2400 nm |
+| albedo_bb_planar_vis.tif             | visible broadband planar albedo                                        | 300-700 nm  |
+| albedo_bb_spherical_nir.tif          | near infrared broadband spherical albedo                               | 700-2400 nm |
+| albedo_bb_spherical_sw.tif           | shortwave broadband spherical albedo                                   | 300-2400 nm |
+| albedo_bb_spherical_vis.tif          | visible broadband spherical albedo                                     | 300-700 nm  |
+| rBRR_01..21.tif                      | bottom of the atmosphere surface reflectance (OLCI bands 1 through 21) |             |
+| albedo_spectral_planar_01..21.tif    | spectral planar albedo (OLCI bands 1 to 11 and 16 to 21)               |             |
+| albedo_spectral_spherical_01..21.tif | spectral spherical albedo (OLCI bands 1 to 11 and 16 to 21)            |             |
+| diagnostic_retrieval.tif             | See next table                                                         |             |
+| conc.tif                             | pollutant concentration (volumetric concentration)                     |             |
+| al.tif                               | effective absorption length(mm)                                        |             |
+| r0.tif                               | reflectance of a semi-infinite non-absorbing snow layer                |             |
+| 03_SICE.tif                          | total ozone product (OLCI) corrected for ozone scattering              |             |
+
+
+| Diagnostic Code | Description                                                                                   |
+|-----------------+-----------------------------------------------------------------------------------------------|
+|               0 | clean snow                                                                                    |
+|               1 | polluted snow                                                                                 |
+|               3 | partially snow covered pixel                                                                  |
+|               6 | polluted snow for which r0 was calculated and not derived from observations                   |
+|               7 | polluted snow of calculated spherical albedo in bands 1 and 2 >0.98 reprocessed as clean snow |
+|             100 | sza<75, no retrival                                                                           |
+|             102 | TOA reflectance at band 21 < 0.1, no retrieval                                                |
+|             103 | TOA reflectance at band 1 < 0.2, no retrieval                                                |
+|             104 | grain_diameter < 0.1, no retrieval, potential cloud flag                                      |
+|             105 | retrieved spherical albedo negative in band 1, 2 or 3                                         |
+|              -n | impossible to solve snow spherical albedo equation at band n                                   |
   
 ![](docs/atbd/SICE_overview1.png)
 

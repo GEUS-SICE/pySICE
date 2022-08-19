@@ -1,13 +1,7 @@
-# pySICEv1.6
+# pySICEv2.0
 #
-# from FORTRAN VERSION 5.2
-# March 31, 2020
-#
-# Latest update of python scripts: 29-04-2020 (bav@geus.dk)
-# - Fixed a bug in the indexing of the polluted pixels for which the spherical albedo equation could not be solved.  Solved the oultiers visible in bands 12-15 and 19-20 and  expended the BBA calculation to few pixels that fell out of the index.
-# - compression of output
-# - new backscatter fraction from Alex
-# - new format for tg_vod.dat file
+# from FORTRAN VERSION 6.0
+# Apr. 2022
 #
 # This code retrieves snow/ice  albedo and related snow products for clean Arctic
 # atmosphere. The errors increase with the load of pollutants in air.

@@ -6,7 +6,7 @@ Update 07032019
  pySICE library
  contains:
      alb2rtoa                  calculates TOA reflectance from surface albedo
-     salbed                    calculates ratm for albedo correction (?)
+     salbed                    calculates albatm for albedo correction (?)
      zbrent                    equation solver
      quad_func                 calculation of quadratic parameters
      funp                      snow spectral planar and spherical albedo function
@@ -23,12 +23,16 @@ Update 07032019
 @author: bav@geus.dk
 """
 
-# pySICEv1.6
+# pySICEv2.0
 #
-# from FORTRAN VERSION 5
-# March 31, 2020
-
-# Latest update of python scripts: 22-10-2021 (bav@geus.dk)
+# from FORTRAN VERSION 6.0
+# Apr. 2022
+#
+# Latest update of python scripts: 15-08-2022 (bav@geus.dk)
+#    - new values for iaginary part of refractive index of ice
+#    - hard coded tg_vod.dat in constants
+# 
+# Older update of python scripts: 22-10-2021 (bav@geus.dk)
 # - code optimization by Ghislain Picard
 
 # Older update of python scripts: 29-04-2021 (bav@geus.dk)
@@ -50,7 +54,7 @@ Update 07032019
 # ntype                     pollutant type: 1(soot), 2( dust), 3 and 4 (other or mixture)
 # conc                      pollutant concentration is defined as the volumetric concentration
 #                           of pollutants devided by the volumetric concentration of ice grains
-# bf                        normalized absorption coefficient of pollutants ay 1000nm ( in inverse mm)
+# polut                        normalized absorption coefficient of pollutants ay 1000nm ( in inverse mm)
 # bm                        Angstroem absorption coefficient of pollutants ( around 1 - for soot, 3-7 for dust)
 #
 # alb_sph(i),i=1,21)        spherical albedo
@@ -84,7 +88,7 @@ Update 07032019
 #
 # Functions required:
 # alb2rtoa                  calculates TOA reflectance from surface albedo
-# salbed                    calculates ratm for albedo correction (?)
+# salbed                    calculates albatm for albedo correction (?)
 # zbrent                    equation solver
 # sol                       solar spectrum
 # analyt_func               calculation of surface radiance
@@ -95,8 +99,8 @@ import os
 import xarray as xr
 import numpy as np
 import numba
-from constants_optim import wls, bai, xa, ya, f0, f1, f2, bet, gam, coef1, coef2, coef3, coef4
-from constants_optim import sol1_clean, sol2, sol3_clean, sol1_pol, sol3_pol, asol, bandcoord
+from constants_optim import wls, bai, xa, ya, f0, f1, f2, bet, gam, coef1, coef2, coef3, coef4, thv0
+from constants_optim import sol1_clean, sol2, sol3_clean, sol1, sol3, asol, bandcoord
 os.environ['PYTROLL_CHUNK_SIZE'] = '256'
 
 
@@ -107,7 +111,10 @@ def process(OLCI_scene, compute_polluted=True, **kwargs):
     aerosol = aerosol_properties(OLCI_scene.elevation, angles.cos_sa, aot=0.1)
     OLCI_scene, angles, snow = snow_properties(OLCI_scene, angles, snow)
     atmosphere = prepare_coef(aerosol, angles)
-    OLCI_scene, snow = clean_snow_albedo(OLCI_scene, angles, aerosol, atmosphere, snow)
+    # retrieving snow impurities
+    impurities = snow_impurities(snow.alb_sph, snow.bal)
+    
+    OLCI_scene, snow = snow_albedo(OLCI_scene, angles, aerosol, atmosphere, snow)
     if compute_polluted:
         OLCI_scene, snow, impurities = polluted_snow_albedo(OLCI_scene, angles, aerosol, atmosphere, snow)
     snow = compute_plane_albedo(OLCI_scene, snow, angles, compute_polluted=compute_polluted)
@@ -159,27 +166,32 @@ def view_geometry(OLCI_scene):
     # sza       solar zenith angle
     # vza       viewing zenith angle
     # cos_sa       cosine of the scattering angle
-    # ak1
-    # ak2
+    # u1        escape function applied to SZA (from sun to surface)
+    # u2        escape function applied to VZA (from surface to satellite)
     raa = 180.-(OLCI_scene.vaa-OLCI_scene.saa)
     sin_sza = np.sin(np.deg2rad(OLCI_scene.sza))
     sin_vza = np.sin(np.deg2rad(OLCI_scene.vza))
     cos_sza = np.cos(np.deg2rad(OLCI_scene.sza))
     cos_vza = np.cos(np.deg2rad(OLCI_scene.vza))
-    ak1 = 3.*(1.+2.*cos_sza)/7
-    ak2 = 3.*(1.+2.*cos_vza)/7
+    # u1 = 3.*(1.+2.*cos_sza)/7
+    # u2 = 3.*(1.+2.*cos_vza)/7
+    # new escape functions (update 2022):
+    u1 = 3/5 * cos_sza + 1/3 + np.sqrt(cos_sza)/3.
+    u2 = 3/5 * cos_vza + 1/3 + np.sqrt(cos_vza)/3.
     cos_raa = np.cos(np.deg2rad(raa))
     inv_cos_za = 1./cos_sza+1./cos_vza
     cos_sa = -cos_sza*cos_vza + sin_sza*sin_vza*cos_raa
+    theta = np.arccos(cos_sa) * 180 / np.pi
 
     angles = xr.Dataset()
     angles['raa'] = raa
     angles['cos_sza'] = cos_sza
     angles['cos_vza'] = cos_vza
-    angles['ak1'] = ak1
-    angles['ak2'] = ak2
+    angles['u1'] = u1
+    angles['u2'] = u2
     angles['inv_cos_za'] = inv_cos_za
     angles['cos_sa'] = cos_sa
+    angles['theta'] = theta
     return angles
 
 
@@ -190,7 +202,8 @@ def ozone_correction(OLCI_scene, write_ozone=False):
     ozone_vod = np.genfromtxt('./tg_vod.dat', delimiter='   ')
     tozon = xr.DataArray(ozone_vod[0:21, 1], coords=[bandcoord])
 
-    OLCI_scene['BXXX'], OLCI_scene['toa'] = molecular_absorption(OLCI_scene.ozone, tozon, OLCI_scene.sza, OLCI_scene.vza, OLCI_scene.toa)
+    # update 2022: no ozone correction
+    # OLCI_scene['BXXX'], OLCI_scene['toa'] = molecular_absorption(OLCI_scene.ozone, tozon, OLCI_scene.sza, OLCI_scene.vza, OLCI_scene.toa)
     OLCI_scene.drop('ozone')  # don't use anymore
     return OLCI_scene
 
@@ -217,16 +230,23 @@ def molecular_absorption(ozone, tozon, sza, vza, toa):
 
     # tvoda = tozon * 0 + 1
     tvoda = 1
-
     toa_cor_o3 = toa * tvoda * np.exp(inv_cos_za * tozon * totadu / 404.59)
-
     return BXXX, toa_cor_o3
+
+
+def rinff(cos_sza, cos_vza):
+    a = 1.247
+    b = 1.186
+    c = 5.157
+    p = 0.0
+    return (a+b*(cos_sza+cos_vza)+c*cos_sza*cos_vza+p)/4./(cos_sza+cos_vza)
 
 
 def prepare_processing(OLCI_scene):
     # Filtering pixels unsuitable for retrieval
     snow = xr.Dataset()
     snow['isnow'] = xr.where(OLCI_scene.toa[20] < 0.1, 102, np.nan)
+    snow.isnow[OLCI_scene.toa[0] < 0.2] = 103
     snow.isnow[OLCI_scene.sza > 75] = 100
 
     mask = np.isnan(snow.isnow)
@@ -237,6 +257,25 @@ def prepare_processing(OLCI_scene):
     OLCI_scene['vza'] = OLCI_scene.vza.where(mask)
     OLCI_scene['elevation'] = OLCI_scene.elevation.where(mask)
 
+    # snow indexes
+    snow['ndsi'] = (OLCI_scene.toa.sel(band=16) - OLCI_scene.toa.sel(band=20))  \
+        /(OLCI_scene.toa.sel(band=16) + OLCI_scene.toa.sel(band=20))
+    snow['ndbi'] = (OLCI_scene.toa.sel(band=0) - OLCI_scene.toa.sel(band=20)) \
+        /(OLCI_scene.toa.sel(band=0) + OLCI_scene.toa.sel(band=20))
+        
+    # case of not 100% snow cover:
+    msk =  OLCI_scene.toa[0] < thv0 
+    snow.isnow[msk] = 3
+    snow.isnow[~msk] = 1
+    # scaling factor for patchy snow at 400nm                     
+    psi = rinff(OLCI_scene['cos_sza'], OLCI_scene['cos_vza'])
+    # factor=snow fraction ( SMALLER THAN 1.0):       
+    snow['factor'] = OLCI_scene.toa[0]/psi
+    
+    # snow TOA corrected for snow fraction                            
+    OLCI_scene['toa'] = xr.where(msk,
+                                 OLCI_scene['toa'] / snow['factor'],
+                                 OLCI_scene['toa'])
     return OLCI_scene, snow
 
 
@@ -250,16 +289,31 @@ def aerosol_properties(height, cos_sa, aot=0.1):
     gaer = g0 + g1 * np.exp(-wls / wave0)
     pr = 0.75 * (1. + cos_sa**2)
 
-    taumol = wls**(-4.05) * np.minimum(1, np.exp(-height / 7400)) * 0.00877
+    # 2021 version:
+    # taumol = wls**(-4.05) * np.minimum(1, np.exp(-height / 7400)) * 0.00877
+    # MOLEC = 1 version:
+    # taumol = 0.008735 * wls**(-4.08) * np.minimum(1, np.exp(-height / 6000))
+    # MOLEC = 0 version:
+    taumol=0.0053/wls**(4.0932)
+
     tau = tauaer + taumol
+
+    # HG phase function for aerosol
+    # pa = (1 - g**2) / (1. - 2. * g * cos_sa + g**2)**1.5
+    # p = (taumol * pr + tauaer * pa) / tau   # the order is critical to have the right order of dims (band, xy)
+    g11= 0.80
+    g22=-0.45
+    pa1=(1-g11*g11)/(1.-2.*g11*cos_sa+g11*g11)**1.5
+    pa2=(1-g22*g22)/(1.-2.*g22*cos_sa+g22*g22)**1.5
+    cp=(gaer-g11)/(g11-g22)
+    pa=cp*pa1+(1.-cp)*pa2
+   
+    pr=0.75*(1.+cos_sa*cos_sa)
+    p=(taumol*pr+tauaer*pa)/tau
 
     # aerosol asymmetry parameter
     g = tauaer * gaer / tau
-
-    # HG phase function for aerosol
-    pa = (1 - g**2) / (1. - 2. * g * cos_sa + g**2)**1.5
-    p = (taumol * pr + tauaer * pa) / tau   # the order is critical to have the right order of dims (band, xy)
-
+    
     aerosol = xr.Dataset()
     aerosol['tau'] = tau
     aerosol['p'] = p
@@ -272,33 +326,33 @@ def aerosol_properties(height, cos_sa, aot=0.1):
 
 def snow_properties(OLCI_scene, angles, snow):
     # retrieval of snow properties ( R_0, size of grains from OLCI channels 865[17] and 1020nm[21] assumed not influenced by atmospheric scattering and absorption processes)
-    # imaginary part of the ice refractive index at 1020nm
-    akap2 = 2.25e-6
+    # imaginary part of the ice refractive index at 865 and 1020nm
+    akap3=2.40e-7
+    akap4=2.25e-6
     # bulk absoprtion coefficient of ice at 1020nm
-    alpha2 = 4.*np.pi*akap2 / 1.020
-    # imaginary part of the ice refractive index at 865nm
-    # akap1=2.4e-7
-    # bulk absoprtion coefficient of ice at 865nm
-    # alpha1=4.*np.pi*akap1/0.865
-
-    # eps = 1/(1-np.sqrt(alpha1/alpha2))
+    alt3=4.*np.pi*akap3/0.865
+    alt4=4.*np.pi*akap4/1.02
+    
+    # eps = 1/(1-np.sqrt(alt3/alt4))
     eps = 1.549559365010611
     # consequently: 1-eps = 1/(1-np.sqrt(alpha2/alpha1))
-
+    
     # reflectivity of nonabsorbing snow layer
     rr1 = OLCI_scene.toa.sel(band=16)
     rr2 = OLCI_scene.toa.sel(band=20)
     r0 = (rr1**eps)*(rr2**(1.-eps))
 
     # effective absorption length(mm)
-    bal = (np.log(rr2/r0)/(angles.ak1*angles.ak2/r0))**2/alpha2
+    bal = (np.log(rr2 / r0) / (angles.u1 * angles.u2 / r0))**2 / alt4
     al = bal/1000.
 
     # effective grain size(mm):diameter
     # xi/(1-g) = 9.2
-    D = al/(9.2*16/9)
+    # D = al/(9.2*16/9)
+    D = al/16
     # snow specific area ( dimension: m*m/kg)
-    area = 6./D/0.917
+    # area = 6./D/0.917
+    area = 104.7/al
 
     # filtering small D
     diameter_thresh = 0.01
@@ -316,85 +370,57 @@ def snow_properties(OLCI_scene, angles, snow):
 
 
 def prepare_coef(aerosol, angles):
-
     otherdims = tuple([d for d in aerosol.tau.dims if d != 'band'])
     inputdims = [('band',) + otherdims] * 3 + [otherdims] * 3
     outputdims = [('band',) + otherdims] * 4
 
-    args = aerosol.tau, aerosol.g, aerosol.p, angles.cos_sza, angles.cos_vza, angles.inv_cos_za
-    t1, t2, ratm, r = xr.apply_ufunc(prepare_coef_numpy, *args, input_core_dims=inputdims, output_core_dims=outputdims)
+    args = aerosol.tau, aerosol.g, aerosol.p, angles.cos_sza, angles.cos_vza, angles.inv_cos_za, aerosol.gaer, aerosol.taumol, aerosol.tauaer
+    t1t2, albatm, r = xr.apply_ufunc(prepare_coef_numpy, *args, input_core_dims=inputdims, output_core_dims=outputdims)
 
     atmosphere = xr.Dataset()
-    atmosphere['t1'] = t1
-    atmosphere['t2'] = t2
-    atmosphere['ratm'] = ratm
+    atmosphere['t1t2'] = t1t2
+    atmosphere['albatm'] = albatm
     atmosphere['r'] = r
     return atmosphere
 
 
 @numba.jit(nopython=True, cache=True)
-def prepare_coef_numpy(tau, g, p, cos_sza, cos_vza, inv_cos_za):
-    one_g_tau = (1 - g) * tau
-
-    # SOBOLEV
+def prepare_coef_numpy(tau, g, p, cos_sza, cos_vza, inv_cos_za, 
+                        gaer, taumol, tauaer):
+    # atmospheric reflectance
     b1 = 1. + 1.5 * cos_sza + (1. - 1.5 * cos_sza) * np.exp(-tau / cos_sza)
     b2 = 1. + 1.5 * cos_vza + (1. - 1.5 * cos_vza) * np.exp(-tau / cos_vza)
 
     sumcos = cos_sza + cos_vza
 
     astra = (1. - np.exp(- tau * inv_cos_za)) / sumcos / 4.
-    oskar = 4. + 3. * one_g_tau
-	# multiple scattering contribution to the atmospheric reflectance
+    oskar = 4. + 3. * (1 - g) * tau
+    # multiple scattering contribution to the atmospheric reflectance
     rms = 1. - b1 * b2 / oskar + (3. * (1. + g) * (cos_sza * cos_vza) - 2. * sumcos) * astra
 
-    r = p * astra + rms
+    r = p * astra + rms  # called ratm in new fortran code
 
-    wa1 = 1.10363
-    wa2 = -6.70122
-    wx0 = 2.19777
-    wdx = 0.51656
-    bex = np.exp((g - wx0) / wdx)
+    # atmospheric transmittance (updated 2022)    
+    tz = 1. + gaer**2 + (1. - gaer**2) * np.sqrt(1. + gaer**2)              
+    Baer = 0.5 + gaer * (gaer**2 - 3.) / tz / 2.             
+    if gaer >= 1.e-3:
+        Baer=(1 - gaer) * ((1 + gaer) / np.sqrt(1.+gaer**2) - 1) / 2 / gaer
+    B = (0.5 * taumol + Baer * tauaer) / tau             
+    t1t2 = np.exp(-B*tau/cos_sza) * np.exp(-B*tau/cos_vza)   
 
-    # backscattering fraction
-    arg = - 0.5 * one_g_tau / ((wa1 - wa2) / (1. + bex) + wa2)
-    
-    # atmospheric backscattering fraction
-    # t1*t2 is the 2-ways atmospheric transmittance (from the sun to the surface and to the satellite)
-    # t1[i,:,:] = np.exp(-(1.-g[i,:,:])*tau[i,:,:]/cos_sza/2.)
-    # t2[i,:,:] = np.exp(-(1.-g[i,:,:])*tau[i,:,:]/cos_vza/2.)
-    t1 = np.exp(arg / cos_sza)
-    t2 = np.exp(arg / cos_vza)
-
-    # SALBED
-    #    ratm = salbed(tau, g)
-    a_s = (.18016, -0.18229, 0.15535, -0.14223)
-    bs = (.58331, -0.50662,  -0.09012, 0.0207)
-    cs = (0.21475, -0.1, 0.13639, -0.21948)
-    als = (0.16775, -0.06969, 0.08093, -0.08903)
-    bets = (1.09188, 0.08994, 0.49647, -0.75218)
-
-    a_cst = a_s[0] + a_s[1] * g
-    b_cst = bs[0] + bs[1] * g
-    c_cst = cs[0] + cs[1] * g
-    al_cst = als[0] + als[1] * g
-    bet_cst = bets[0] + bets[1] * g
-
-    for n in range(2, 4):
-        if n == 2:
-            gg = g ** 2
-        else:
-            gg *= g
-        a_cst += a_s[n] * gg
-        b_cst += bs[n] * gg
-        c_cst += cs[n] * gg
-        al_cst += als[n] * gg
-        bet_cst += bets[n] * gg
-
-    ratm = tau * (a_cst * np.exp(-tau / al_cst) + b_cst * np.exp(-tau / bet_cst) + c_cst)
-    return t1, t2, ratm, r
+    # atmospheric spherical albedo (updated 2022)
+    gasa = 0.5772157
+    y = (1. + tau) * tau * np.exp(-tau) / 4.
+    z3 = tau**2 * (-np.log(tau) - gasa)
+    z4 = tau**2 * (tau - tau**2 / 4 + tau**3 / 18)
+    Z = z3 + z4
+    W1=1 + (1. + 0.5 * tau) * Z / 2 - y
+    W2=1 + 0.75 * tau * (1.-g)
+    albatm = 1 - W1 / W2
+    return t1t2, albatm, r
 
 
-def alb2rtoa(a, t1, t2, r0, ak1, ak2, ratm, r):
+def alb2rtoa(a, t1t2, r0, u1, u2, albatm, r):
     # Function that calculates the theoretical reflectance from a snow spherical albedo a
     # This function can then be solved to find optimal snow albedo
     # Inputs:
@@ -403,172 +429,141 @@ def alb2rtoa(a, t1, t2, r0, ak1, ak2, ratm, r):
     #
     # Outputs:
     # rs                  surface reflectance at specific channel
-    surf = t1 * t2 * r0 * a**(ak1 * ak2 / r0) / (1 - a * ratm)
+    surf = t1t2 * r0 * a**(u1 * u2 / r0) / (1 - a * albatm)
     rs = r + surf
     return rs
 
+def snow_impurities(alb_sph, al):
+    # analysis of snow impurities
+    # ( the concentrations below 0.0001 are not reliable )
+    # polut    normalized absorption coefficient of pollutants ay 1000nm ( in inverse mm)
+    # bm    Angstroem absorption coefficient of pollutants ( around 1 - for soot, 3-7 for dust
 
-def clean_snow_albedo(OLCI_scene, angles, aerosol, atmosphere, snow):
-    # =========== clean snow  ====================================
-    # for that we calculate the theoretical reflectance at band 1 of a surface with:
-    # r0 = 1, a (albedo) = 1, ak1 = 1, ak2 = 1
-    # t1 and t2 are the backscattering fraction
-    snow['rs_1'] = alb2rtoa(1, atmosphere.t1.sel(band=0), atmosphere.t2.sel(band=0), 1, 1, 1, atmosphere.ratm.sel(band=0), atmosphere.r.sel(band=0))
+    # initializing new outputs:
+    aload_ppm =  wls.sel(band=0)*0
+    deff =  wls.sel(band=0)*0
+    absor1 =  wls.sel(band=0)*0
+    absef660 =  wls.sel(band=0)*0
+    absor1000 =  wls.sel(band=0)*0
+    
+    ind_nonan = ~np.isnan(alb_sph.sel(band=0)) & ~np.isnan(alb_sph.sel(band=3))
+    p1 = np.log(alb_sph.sel(band=0))**2
+    p2 = np.log(alb_sph.sel(band=3))**2
+    msk =  (alb_sph.sel(band=0) < 0.999) &  (alb_sph.sel(band=3) < 0.999)
 
-    # we then compare it to the observed toa[0] value
-    snow['ind_clean'] = OLCI_scene.toa.sel(band=0) >= snow.rs_1
-    snow.isnow[snow.ind_clean] = 0
+    # 1-retrieved absorption Angström exponent (AAE):      
+    bm = np.log(xr.where(msk, p1 / p2, 1)) / np.log(wls.sel(band=3) / wls.sel(band=0))
+    bm = xr.where(bm > 0.9, bm, 0)
+    # type of pollutants
+    ntype = 2 + (bm > 1.2)     # 1=soot, 2 = dust, 0 = no impurity retrieved
+    ntype = xr.where(bm>0.9, ntype, 0)
+    # 2-retrieved pollution load coefficient (PLC), 1/mm:      
+    polut = xr.where(bm > 0.9, 
+                  wls.sel(band=0)**bm * p1 / al,
+                  0)
 
-    snow['ind_pol'] = OLCI_scene.toa.sel(band=0) < snow.rs_1
+    # special case of soot impurities:     
+    msk_soot = (bm > 0) & (bm < 1.2)
+    aload_ppm = xr.where(msk_soot, polut / 2.06e+3, aload_ppm)
+    # if (factor < 0.99):
+    #     nclass=3
 
-    # clean snow spherical albedo derivation: alb_sph
-    snow['alb_sph'] = np.minimum(np.exp(-np.sqrt(1000. * 4. * np.pi * (bai / wls * snow.al))), 1)
+    # DUST IMPURITIES:
+    # 3- retrieved effective diameter of dust grains:
+    deff = 39.7373 - 11.8195 * bm + 0.8325 * bm * bm
+    # 4- retrieved volumetric absorption coefficient of dust impurities
+    # at the wavelength 1 micron      (1/mm)
+    absor1 = 10.916 - 2.0831 * bm + 0.5441 * bm * bm
+    # mass absorption coefficient (MAC) of dust in snow ( cm**3/g/mm)
+    dens2 = 2.65   # density of dust
+    densi = 2.65 / 0.917
+    aload = 1.8 * densi * polut / absor1
+    # 5- retrieved impurity load (ppmw- ppm weight):
+    aload_ppm = 1.e+6 * aload
+    # 6- retrieved mass absorption coefficient (MAC) of dust in snow at 1000nm(m**2/g)
+    absor1000 = absor1 / dens2 * 1.e-3
+    # 7-retrieved mass absorption coefficient (MAC) of dust in snow at 660nm(m**2/g)
+    absef660 = absor1000 * (0.660)**(-bm)
+
+    # no retrieval for too load impurity load (below 2ppm):
+    msk_low_imp = (aload_ppm <= 2)
+    deff = xr.where(msk_low_imp, 0, deff)
+    absor1 = xr.where(msk_low_imp, 0, absor1)
+    absef660 = xr.where(msk_low_imp, 0, absef660)
+    absor1000 = xr.where(msk_low_imp, 0, absor1000)
+    bm = xr.where(msk_low_imp, 0, bm)
+    polut = xr.where(msk_low_imp, 0, polut)
+    aload_ppm = xr.where(msk_low_imp, 0, aload_ppm)
+    
+    impurities = xr.Dataset()
+    impurities['ntype'] = ntype.where(ind_nonan)
+    impurities['polut'] = polut.where(ind_nonan)
+    impurities['bm'] = bm.where(ind_nonan)
+    impurities['aload_ppm'] = aload_ppm.where(ind_nonan)
+    return impurities
+
+
+def snow_albedo_direct(OLCI_scene, angles, aerosol, atmosphere, snow, impurities):
+    # direct caluclation including impurities
+    # not sure where it is used
+
+    alpha = 1000. * 4. * np.pi * (bai / wls * snow.al)
+    sdu = impurities.polut * wls**(-impurities.bm)
+    snow['alb_sph_direct'] = np.minimum(snow.factor * np.exp(-np.sqrt(alpha + sdu)), 1)
+    snow['rp_direct'] = snow.alb_sph_direct ** angles.u1
+    snow['refl_direct'] = snow.factor * snow.r0 * snow.alb_sph_direct ** (angles.u1 * angles.u2 / snow.r0)
     return OLCI_scene, snow
 
 
-def polluted_snow_albedo(OLCI_scene, angles, aerosol, atmosphere, snow):
-    if not np.any(snow.ind_pol):
-        impurities = xr.Dataset()
-        impurities['ntype'] = xr.full_like(OLCI_scene.sza, np.nan)
-        impurities['bf'] = xr.full_like(OLCI_scene.sza, np.nan)
-        impurities['conc'] = xr.full_like(OLCI_scene.sza, 0)
-        return OLCI_scene, snow, impurities
-
-    snow.isnow[snow.ind_pol] = 1
-    #  very dirty snow
-    ind_very_dark = (OLCI_scene.toa.sel(band=20) < 0.4) & snow.ind_pol
-    snow.isnow[ind_very_dark] = 6
-
-    def compute_rclean(cos_sza, cos_vza, cos_sa, raa):
-        am11 = np.sqrt(1.-cos_sza**2.)
-        am12 = np.sqrt(1.-cos_vza**2.)
-
-        theta = np.arccos(-cos_sza * cos_vza + am11 * am12 * np.cos(raa*3.14159/180.)) * 180./np.pi
-        # theta = np.rad2deg(np.arccos(cos_sa))
-
-        pz = 11.1 * np.exp(-0.087 * theta) + 1.1 * np.exp(-0.014 * theta)
-
-        sumcos = cos_sza + cos_vza
-        rclean = 1.247 + 1.186 * sumcos + 5.157 * cos_sza * cos_vza + pz
-
-        return rclean / 4. / sumcos
-
-    snow['r0'] = snow.r0.where(~ind_very_dark, compute_rclean(angles.cos_sza, angles.cos_vza, angles.cos_sa, angles.raa))
-
-    # approximation of the transcendental equation allowing closed-from solution
-    # alb_sph[:,ind_pol] =   (toa_cor_o3[:,ind_pol] - r[:,ind_pol]) (t1[:,ind_pol]*t2[:,ind_pol]*r0[ind_pol] + ratm[:,ind_pol]*(toa_cor_o3[:,ind_pol] - r[:,ind_pol]))
-
+def snow_albedo_solved(OLCI_scene, angles, aerosol, atmosphere, snow):
     # solving iteratively the transcendental equation
-    iind_pol = dict(xy=np.arange(len(snow.ind_pol))[snow.ind_pol])
-    snow.alb_sph[iind_pol] = 1
+    # Update 2022: for all pixels!
+    ind_solved = (snow.isnow == 1) | (snow.isnow == 3)
+    iind_solved = dict(xy=np.arange(len(ind_solved))[ind_solved])
+    snow.alb_sph[iind_solved] = 1
 
-    def solver_wrapper(toa_cor_o3, tau, t1, t2, r0, ak1, ak2, ratm, r):
+    def solver_wrapper(toa_cor_o3, tau, t1, t2, r0, u1, u2, albatm, r):
         # it is assumed that albedo is in the range 0.1-1.0
-        return zbrent(0.1, 1, args=(t1, t2, r0, ak1, ak2, ratm, r, toa_cor_o3), max_iter=30, tolerance=2e-4)
+        return zbrent(0.1, 1, args=(t1, t2, r0, u1, u2, albatm, r, toa_cor_o3), max_iter=30, tolerance=2e-4)
 
     solver_wrapper_v = np.vectorize(solver_wrapper)
 
-    # loop over all bands except band 19, 20
-    for i_channel in np.append(np.arange(18), [20]):
-        #print('band=', i_channel)
-        snow.alb_sph.sel(band=i_channel)[iind_pol] = solver_wrapper_v(
-            OLCI_scene.toa.sel(band=i_channel)[iind_pol],
-            aerosol.tau.sel(band=i_channel)[iind_pol],
-            atmosphere.t1.sel(band=i_channel)[iind_pol],
-            atmosphere.t2.sel(band=i_channel)[iind_pol],
-            snow.r0[iind_pol],
-            angles.ak1[iind_pol], angles.ak2[iind_pol],
-            atmosphere.ratm.sel(band=i_channel)[iind_pol],
-            atmosphere.r.sel(band=i_channel)[iind_pol]
+    # loop over all bands 
+    for i_channel in range(21):
+        snow.alb_sph.sel(band=i_channel)[iind_solved] = solver_wrapper_v(
+            OLCI_scene.toa.sel(band=i_channel)[iind_solved],
+            aerosol.tau.sel(band=i_channel)[iind_solved],
+            atmosphere.t1.sel(band=i_channel)[iind_solved],
+            atmosphere.t2.sel(band=i_channel)[iind_solved],
+            snow.r0[iind_solved],
+            angles.u1[iind_solved], angles.u2[iind_solved],
+            atmosphere.albatm.sel(band=i_channel)[iind_solved],
+            atmosphere.r.sel(band=i_channel)[iind_solved]
         )
         ind_bad = snow.alb_sph.sel(band=i_channel) == -999
         snow.isnow[ind_bad] = -i_channel
+    # some filtering
     snow['alb_sph'] = snow.alb_sph.where(snow.isnow >= 0)
-
-    # INTERNal CHECK FOR CLEAN PIXELS
-    # Are reprocessed as clean
-    ind_clear_pol = ((snow.alb_sph.sel(band=0) > 0.98) | (snow.alb_sph.sel(band=1) > 0.98)) & snow.ind_pol
-    snow.isnow[ind_clear_pol] = 7
-
-    snow['alb_sph'] = snow.alb_sph.where(~ind_clear_pol, np.exp(-np.sqrt(4. * 1000. * np.pi * snow.al * (bai / wls))))
-
-    # re-defining polluted pixels
-    snow['ind_pol'] = snow.ind_pol & (snow.isnow != 7)
-    iind_pol = dict(xy=np.arange(len(snow.ind_pol))[snow.ind_pol])
-
-    # retrieving snow impurities
-    impurities = xr.Dataset()
-    impurities['ntype'], impurities['bf'], impurities['conc'] = snow_impurities(snow.alb_sph, snow.bal)
-
-    # alex   09.06.2019
-    # reprocessing of albedo to remove gaseous absorption using linear polynomial approximation in the range 753-778nm.
-    # Meaning: alb_sph[12],alb_sph[13] and alb_sph[14] are replaced by a linear  interpolation between alb_sph[11] and alb_sph[15]
-    afirn = (snow.alb_sph.sel(band=15)[iind_pol] - snow.alb_sph.sel(band=11)[iind_pol]) / (wls.sel(band=15) - wls.sel(band=11))
-    bfirn = snow.alb_sph.sel(band=15)[iind_pol] - afirn * wls.sel(band=15)
-
-    for b in [12, 13, 14]:
-        snow.alb_sph.sel(band=b)[iind_pol] = bfirn + afirn * wls.sel(band=b)
-
-    # BAV 09-02-2020: 0.5 to 0.35
-    # pixels that are clean enough in channels 18 19 20 and 21 are not affected by pollution, the analytical equation can then be used
-    ind_ok = (OLCI_scene.toa.sel(band=20) > 0.35) & snow.ind_pol
-    iind_ok = dict(xy=np.arange(len(ind_ok))[ind_ok])
-
-    for b in range(17, 21):
-        snow.alb_sph.sel(band=b)[iind_ok] = np.exp(-np.sqrt(4.*1000. * np.pi * snow.al[iind_ok] * (bai.sel(band=b) / wls.sel(band=b))))
-
-    # Alex, SEPTEMBER 26, 2019
-    # to avoid the influence of gaseous absorption (water vapor) we linearly interpolate in the range 885-1020nm for bare ice cases only (low toa[20])
-    # Meaning: alb_sph[18] and alb_sph[19] are replaced by a linear interpolation between alb_sph[17] and alb_sph[20]
-    bcoef = (snow.alb_sph.sel(band=20)[iind_pol] - snow.alb_sph.sel(band=17)[iind_pol]) / (wls.sel(band=20) - wls.sel(band=17))
-    acoef = snow.alb_sph.sel(band=20)[iind_pol] - bcoef * wls.sel(band=20)
-
-    for b in [18, 19]:
-        snow.alb_sph.sel(band=b)[iind_pol] = acoef + bcoef * wls.sel(band=b)
-    return OLCI_scene, snow, impurities
-
-
-def snow_impurities(alb_sph, bal):
-    # analysis of snow impurities
-    # ( the concentrations below 0.0001 are not reliable )
-    # bf    normalized absorption coefficient of pollutants ay 1000nm ( in inverse mm)
-    # bm    Angstroem absorption coefficient of pollutants ( around 1 - for soot, 3-7 for dust)
-
-    ind_nonan = ~np.isnan(alb_sph.sel(band=0)) & ~np.isnan(alb_sph.sel(band=1))
-
-    p1 = np.log(alb_sph.sel(band=0))**2
-    p2 = np.log(alb_sph.sel(band=1))**2
-    bm = np.log(p1 / p2) / np.log(wls.sel(band=1) / wls.sel(band=0))
-
-    # type of pollutants
-    ntype = 1 + (bm > 1.2)     # 1=soot, 2 = dust
-
-    soda = (wls.sel(band=0)**bm).where(bm >= 0.1)
-    bf = soda * p1 / bal
-
-    # normalized absorption coefficient of pollutants at the wavelength  1000nm
-    k_abs_0 = p1 / bal
-    # bal   -effective absorption length in microns
-
-    B_soot = 1.6        # enhancement factors for soot
-    B_ice = 0.9       # enhancement factors for ice grains
-    alfa_soot = 4. * np.pi * 0.47 / wls.sel(band=0)  # bulk soot absorption coefficient at 1000nm
-    k_dust = 0.01       # volumetric absorption coefficient of dust
-
-    conc = (ntype == 1) * B_soot * k_abs_0 / B_ice / alfa_soot + \
-           (ntype == 2) * B_soot * k_abs_0 / k_dust
-
-    ntype = ntype.where(bm > 0.5, 3)  # type is other or mixture
-    ntype = ntype.where(bm < 10., 4)  # type is other or mixture
-
-    return ntype.where(ind_nonan), bf.where(ind_nonan), conc.where(ind_nonan)
+    ind_neg_alb =  (snow.alb_sph.sel(band=0)<0) | (snow.alb_sph.sel(band=1) < 0) | (snow.alb_sph.sel(band=2) < 0)
+    snow['alb_sph'] = xr.dataset(ind_neg_alb, np.nan, snow['alb_sph'])
+    snow.isnow[ind_neg_alb] = 105
+    
+    # correcting the retrived spherical albedo for fractional snow cover
+    snow['alb_sph'] = snow['factor'] * snow['alb_sph']
+    snow['rp'] = snow.alb_sph ** angles.u1
+    snow['refl'] = snow.factor * snow.r0 * snow.alb_sph ** (angles.u1 * angles.u2 / snow.r0)
+    
+    snow.isnow[snow.alb_sph > 0.98] = 1
+    snow.isnow[(snow.alb_sph <= 0.98) & (snow.factor > 0.99)] = 2
+    snow.isnow[(snow.alb_sph <= 0.98) & (snow.factor <= 0.99)] = 3
+    return OLCI_scene, snow
 
 
 @numba.jit(nopython=True, cache=True)
-def f(albedo, t1, t2, r0, ak1, ak2, ratm, r, toa_cor_o3):
-    surf = t1 * t2 * r0 * albedo**(ak1 * ak2 / r0) / (1 - albedo * ratm)
+def f(albedo, t1t2, r0, u1, u2, albatm, r, toa_cor_o3):
+    surf = t1t2 * r0 * albedo**(u1 * u2 / r0) / (1 - albedo * albatm)
     rs = r + surf
-    return toa_cor_o3 - rs  # sl.alb2rtoa(albedo, t1, t2, r0, ak1, ak2, ratm, r)
+    return toa_cor_o3 - rs
 
 
 @numba.jit(nopython=True, cache=True)
@@ -646,56 +641,77 @@ def zbrent(x0, x1, args=(), max_iter=100, tolerance=1e-6):
     return x1
 
 
-def compute_plane_albedo(OLCI_scene, snow, angles, compute_polluted=True):
-    # ========= derivation of plane albedo and reflectance ===========
-    snow['rp'] = snow.alb_sph ** angles.ak1
-    snow['refl'] = snow.r0 * snow.alb_sph ** (angles.ak1 * angles.ak2 / snow.r0)
-
+def compute_BBA(OLCI_scene, snow, angles, compute_polluted=True):
     ind_all_clean = snow.ind_clean | (snow.isnow == 7)
 
     # CalCULATION OF BBA of clean snow
 
-    # old method: integrating equation
+    # Original method: Recalculating spectrum and integrating it.
+    # This is the exact, but slow mehtod to calculate clean snow BBA.
+    # For each clean pixel, the derived spectrum is caluclated from u1, al and
+    # the imaginary part of the refraction index at specified wavelength.
+    # This scaling is done in function funp below. Then this function is
+    # integrated uing the qsimp method.    
     # BBA_v = np.vectorize(sl.BBA_calc_clean)
-    # p1,p2,s1,s2 = BBA_v(al[ind_all_clean], ak1[ind_all_clean])
+    # p1,p2,s1,s2 = BBA_v(al[ind_all_clean], u1[ind_all_clean])
     #
     # visible(0.3-0.7micron)
-    # rp1[ind_all_clean]=p1/sol1_clean
-    # rs1[ind_all_clean]=s1/sol1_clean
+    # rp1[ind_all_clean]=p1/sol1
+    # rs1[ind_all_clean]=s1/sol1
     # near-infrared (0.7-2.4micron)
     # rp2[ind_all_clean]=p2/sol2
     # rs2[ind_all_clean]=s2/sol2
     # shortwave(0.3-2.4 micron)
-    # rp3[ind_all_clean]=(p1+p2)/sol3_clean
-    # rs3[ind_all_clean]=(s1+s2)/sol3_clean
+    # rp3[ind_all_clean]=(p1+p2)/sol3
+    # rs3[ind_all_clean]=(s1+s2)/sol3
 
     # approximation
+    # old version:
+    # snow['rp3'] = plane_albedo_sw_approx(snow.diameter, angles.cos_sza).where(ind_all_clean)
+    # snow['rs3'] = spher_albedo_sw_approx(snow.diameter).where(ind_all_clean)
+    
+    # Update 2022:
     # planar albedo
     # rp1 and rp2 not derived anymore
-
-    # rp3[ind_all_clean] = sl.plane_albedo_sw_approx(D[ind_all_clean], cos_sza[ind_all_clean])
-    snow['rp3'] = plane_albedo_sw_approx(snow.diameter, angles.cos_sza).where(ind_all_clean)
+    snow['rp3'] = 0.5271+0.3612* np.exp(-angles.u1*np.sqrt(0.02350*snow.al))
+    # rvis = np.exp(-angles.u1*np.sqrt (7.86e-5*snow.al))
+    # rnir = 0.2335+0.56*np.exp(-angles.u1*np.sqrt(0.0327*snow.al))
+    
     #     spherical albedo
     # rs1 and rs2 not derived anymore
-    snow['rs3'] = spher_albedo_sw_approx(snow.diameter).where(ind_all_clean)
+    snow['rs3'] = 0.5271+0.3612* np.exp(-np.sqrt(0.02350*snow.al))
+    # rviss = np.exp(-np.sqrt (7.86e-5*snow.al))
+    # rnirs = 0.2335+0.56*np.exp(-np.sqrt(0.0327*snow.al))
+    
+    msk = (snow.isnow == 3)
+    snow['rp3'] = xr.where(msk, snow['rp3']*snow.factor, snow['rp3'])
+    # rvis = xr.where(msk, rvis*snow.factor, rvis)
+    # rnir = xr.where(msk, rnir*snow.factor, rnir)
+    
+    snow['rs3'] = xr.where(msk, snow['rs3']*snow.factor, snow['rs3'])
+    # rviss = xr.where(msk, rviss*snow.factor, rviss)
+    # rnirs = xr.where(msk, rnirs*snow.factor, rnirs)
 
     if compute_polluted:
         # calculation of the BBA for the polluted snow
         iind_pol = dict(xy=np.arange(len(snow.ind_pol))[snow.ind_pol])
 
-        # rp1[iind_pol], rp2[iind_pol], rp3[iind_pol] = sl.BBA_calc_pol(rp[iind_pol], asol, sol1_pol, sol2, sol3_pol)
-        # rs1[iind_pol], rs2[iind_pol], rs3[iind_pol] = sl.BBA_calc_pol(alb_sph[iind_pol], asol, sol1_pol, sol2, sol3_pol)
+        # rp1[iind_pol], rp2[iind_pol], rp3[iind_pol] = sl.BBA_calc_pol(rp[iind_pol], asol, sol1, sol2, sol3)
+        # rs1[iind_pol], rs2[iind_pol], rs3[iind_pol] = sl.BBA_calc_pol(alb_sph[iind_pol], asol, sol1, sol2, sol3)
 
-        _, _, snow.rp3[iind_pol] = BBA_calc_pol(snow.rp[iind_pol], asol, sol1_pol, sol2, sol3_pol)
-        _, _, snow.rs3[iind_pol] = BBA_calc_pol(snow.alb_sph[iind_pol], asol, sol1_pol, sol2, sol3_pol)
+        _, _, snow.rp3[iind_pol] = BBA_calc_pol(snow.rp[iind_pol], asol, sol1, sol2, sol3)
+        _, _, snow.rs3[iind_pol] = BBA_calc_pol(snow.alb_sph[iind_pol], asol, sol1, sol2, sol3)
         return snow
 
 
-def funp(x, al, sph_calc, ak1):
+def funp(x, al, sph_calc, u1):
     #     Spectral planar albedo
+    # Original way to recalculate the spectral albedo from al, u1 and the 
+    # ice refraction index.
+    # Currently not used. But do not remove.
     # Inputs:
     # x                     input wavelength (should work with any)
-    # ak1
+    # u1
     # al                    absorption length
     # sph_calc              sph_calc= 0 for planar =1 for spherical
     #
@@ -709,17 +725,15 @@ def funp(x, al, sph_calc, ak1):
     # using numpy interpolation
 
     y = np.interp(x, xa, ya)
-
     dega = 1000. * al * 4.*np.pi*y/x
     pow = np.sqrt(dega)
-
     if (pow >= 1.e-6):
         rsd = np.exp(-pow)
     else:
         rsd = 1.
 
     if (sph_calc == 0):
-        rs = rsd**ak1
+        rs = rsd**u1
     elif (sph_calc == 1):
         rs = rsd
 
@@ -731,6 +745,7 @@ def funp(x, al, sph_calc, ak1):
 
 
 def plane_albedo_sw_approx(D, cos_sza):
+    # not used anymore
     anka = 0.7389 - 0.1783 * cos_sza + 0.0484 * cos_sza**2.
     banka = 0.0853 + 0.0414 * cos_sza - 0.0127 * cos_sza**2.
     canka = 0.1384 + 0.0762 * cos_sza - 0.0268 * cos_sza**2.
@@ -740,6 +755,7 @@ def plane_albedo_sw_approx(D, cos_sza):
 
 
 def spher_albedo_sw_approx(D):
+    # not used anymore
     anka = 0.6420
     banka = 0.1044
     canka = 0.1773
@@ -748,15 +764,24 @@ def spher_albedo_sw_approx(D):
     return anka + banka * np.exp(-1000 * D / diam1) + canka * np.exp(-1000 * D / diam2)
 
 
-def BBA_calc_clean(al, ak1):
+def BBA_calc_clean(al, u1):
+    # CalCULATION OF BBA of clean snow
+
+    # Original method: Recalculating spectrum and integrating it.
+    # This is the exact, but slow mehtod to calculate clean snow BBA.
+    # For each clean pixel, the derived spectrum is caluclated from u1, al and
+    # the imaginary part of the refraction index at specified wavelength.
+    # This scaling is done in function funp below. Then this function is
+    # integrated uing the qsimp method.    
+    # Currently not used. But do not remove.
+
     # for clean snow
     # plane albedo
     sph_calc = 0  # planar
     # visible(0.3-0.7micron)
 
     def func_integ(x):
-        return funp(x, al, sph_calc, ak1)
-
+        return funp(x, al, sph_calc, u1)
     p1 = qsimp(func_integ, 0.3, 0.7)
 
     # near-infrared (0.7-2.4micron)
@@ -767,7 +792,7 @@ def BBA_calc_clean(al, ak1):
     sph_calc = 1  # spherical calculation
 
     def func_integ(x):
-        return funp(x, al, sph_calc, ak1)
+        return funp(x, al, sph_calc, u1)
 
     # visible(0.3-0.7micron)
 #        s1 = trapzd(func_integ,0.3,0.7, 20)
@@ -846,28 +871,29 @@ def BBA_calc_pol(alb, asol, sol1_pol, sol2, sol3_pol):
     r7 = alb[16, :]
     r8 = alb[20, :]
 
-    sa1, a1, b1, c1 = quad_func(alam2, alam3, alam5, r2, r3, r5)
-    ajx1 = a1*sol1_pol
+    # QUADRATIC POLYNOMIal for the range 400-709nm
+    _, a1, b1, c1 = quad_func(alam2, alam3, alam5, r2, r3, r5)
+    ajx1 = a1*sol1
     ajx2 = b1*coef1
     ajx3 = c1*coef2
 
     aj1 = ajx1 + ajx2 + ajx3
-    # segment 2.1
+
     # QUADRATIC POLYNOMIal for the range 709-865nm
-    sa1, a2, b2, c2 = quad_func(alam5, alam6, alam7, r5, r6, r7)
+    _, a2, b2, c2 = quad_func(alam5, alam6, alam7, r5, r6, r7)
     ajx1 = a2 * asol
     ajx2 = b2 * coef3
     ajx3 = c2 * coef4
-
-    aj2 = ajx1 + ajx2 + ajx3    # segment 2.2
+    aj2 = ajx1 + ajx2 + ajx3
+    
     # exponential approximation for the range 865- 2400 nm
-    z1 = 0.865
-    z2 = 2.4
     rati = r7 / r8
     alasta = (alam8 - alam7) / np.log(rati)
     an = 1. / alasta
     p = r7 * np.exp(alam7 / alasta)
-
+    
+    z1 = 0.865
+    z2 = 2.4
     aj31 = (1. / an) * (np.exp(-an * z2) - np.exp(-an * z1))
     aj32 = (1. / (bet + an)) * (np.exp(-(bet + an) * z2) - np.exp(-(an + bet) * z1))
     aj33 = (1. / (gam + an)) * (np.exp(-(gam + an) * z2) - np.exp(-(an + gam) * z1))
@@ -891,6 +917,5 @@ def quad_func(x0, x1, x2, y0, y1, y2):
     a1 = x1 * x2 * y0 / d1 + x0 * x2 * y1 / d2 + x0 * x1 * y2 / d3
     b1 = -(x1 + x2) * y0 / d1 - (x0 + x2) * y1 / d2 - (x0 + x1) * y2 / d3
     c1 = y0 / d1 + y1 / d2 + y2 / d3
-    x = x1
-    sa = a1 + b1 * x + c1 * x * x
+    sa = a1 + b1 * x1 + c1 * x1 * x1
     return sa, a1, b1, c1

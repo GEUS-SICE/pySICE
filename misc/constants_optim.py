@@ -12,14 +12,6 @@ import xarray as xr
 
 bandcoord = ('band', np.arange(21))
 
-
-# solar spectrum constants
-f0 = 32.38
-f1 = -160140.33
-f2 = 7959.53
-bet = 1./(85.34*1.e-3)
-gam = 1./(401.79*1.e-3)
-
 # ICE REFRATIVE INDEX
 xa = np.array([2.010E-001, 2.019E-001, 2.100E-001, 2.500E-001, 3.00E-001, 3.500E-001, 3.900E-001, 4.000E-001,
                4.100E-001, 4.200E-001, 4.300E-001, 4.400E-001, 4.500E-001, 4.600E-001, 4.700E-001, 4.800E-001, 4.900E-001, 5.000E-001,
@@ -64,12 +56,58 @@ wls = xr.DataArray([0.4000E+00, 0.4125E+00, 0.4425E+00, 0.4900E+00, 0.5100E+00, 
                     0.8650E+00, 0.8850E+00, 0.9000E+00, 0.9400E+00, 0.1020E+01], coords=[bandcoord])
 
 # Imaginary part of ice refrative index at OLCI channels
-bai = xr.DataArray([2.365E-11, 2.7E-11, 7.0E-11, 4.17E-10,
-                    8.04E-10,  2.84E-09, 8.58E-09,  1.78E-08,  1.95E-08, 2.1E-08, 3.3E-08, 6.23E-08, 7.1E-08,  7.68E-08,  8.13E-08,
-                    9.88E-08,  2.4E-07, 3.64E-07,  4.2E-07, 5.53e-07, 2.25E-06], coords=[bandcoord])
+bai = xr.DataArray([2.365E-11, 2.7E-11, 7.0E-11, 4.17E-10, 8.04E-10,  
+                    2.84E-09, 8.58E-09,  1.78E-08,  1.95E-08, 2.1E-08, 
+                    3.3E-08, 6.23E-08, 7.1E-08,  7.68E-08,  8.13E-08,
+                    9.88E-08,  2.4E-07, 3.64E-07,  4.2E-07, 5.53e-07, 
+                    2.25E-06], coords=[bandcoord])
+# in fortran code:
+# c       imaginary part of ice refractive index at OLCI channels      
+#     DATA kappa/6.27E-10,5.78E-10,6.49E-10,
+#  c 1.08E-9,1.46E-9,3.35E-09,    
+#  c 8.58E-09,1.78E-08,1.95E-08,2.1E-08,3.3E-08,6.23E-08,7.1E-08,
+#  c 7.68E-08,8.13E-08,9.88E-08,2.4E-07,3.64E-07,4.2E-07,5.53e-07,
+#  c       2.25E-06/
+
+# BULK ice absorption coefficient at all OLCI channels  (1/nm)   
+alpha = 4 * np.pi * bai / wls
+
+
+# ozone vertical optical density  at OLCI channels      
+cabsoz = xr.DataArray([1.3782e-4, 3.0488e-4, 1.6457e-3, 8.9359e-3, 1.7505e-2,
+                       4.3471e-2, 4.4871e-2, 2.1016e-2, 1.7162e-2, 1.4663e-2,
+                       7.9830e-3, 3.8797e-3, 2.9338e-3, 2.7992e-3, 2.7297e-3,
+                       3.2560e-3, 8.9569e-4, 5.1888e-4, 6.7158e-4, 3.1278e-4,
+                       1.4088e-5], coords=[bandcoord])
+
+# relative vertical optical density of ozone f at all OLCI channels
+# (normalized to that at 620nm)
+f = cabsoz/cabsoz.isel(band=6)
+
+# new constants defined by Alex
+# aerosol properties(aot=aot500nm,ANNA=Angström exponent)
+aot = 0.07
+anna = 1.3
+# MOLEC=0,1 - two versions of molecular optical thickness
+molec = 0
+jend = 100 # number of pixels to be printed (with spectral data)
+# patchy snow threshold for the channel R(400nm)
+thv0 = 0.5
+# threshold for the measured and simulated spectra differences
+thv1 = 10.
+# threshold for the grain diameter
+thv2 = 0.07
+# threshold for the total ozone column retrieved
+thv3 = 1000.
+
 
 # %% Solar flux
-
+# solar spectrum constants
+f0 = 32.38
+f1 = -160140.33
+f2 = 7959.53
+bet = 1./0.08534
+gam = 1./0.40179
 
 def sol(x):
     # SOLAR SPECTRUM at GROUND level
@@ -85,33 +123,25 @@ def sol(x):
     return sol1a+sol1b+sol1c
 
 
-sol0 = (f0 + f1*np.exp(-bet * 0.4) + f2*np.exp(-gam * 0.4))*0.1
-
 # solar flux calculation
 # sol1      visible(0.3-0.7micron)
-# somehow, a different sol1 needs to be used for clean snow and polluted snow
-sol1_clean = sol(0.7) - sol(0.4) + sol0
-sol1_pol = sol(0.7) - sol(0.3)
+# Update 2022: same for clean and polluted
+sol1 = sol(0.7) - sol(0.3)
 # sol2      near-infrared (0.7-2.4micron)
-# same for clean and polluted
+# Update 2022: same for clean and polluted
 sol2 = sol(2.4) - sol(0.7)
-
 # sol3      shortwave(0.3-2.4 micron)
-# sol3 is also different for clean snow and polluted snow
-sol3_clean = sol1_clean + sol2
-sol3_pol = sol1_pol + sol2
+sol3 = sol1 + sol2
 
 # asol specific band
 asol = sol(0.865) - sol(0.7)
 
-# %% analystical integration of the solar flux
-
-
+# analystical integration of the solar flux
 def analyt_func(z1, z2):
     # see BBA_calc_pol
     # compatible with array
     ak1 = (z2**2.-z1**2.)/2.
-    ak2 = (z2/bet+1./bet/bet)*np.exp(-bet*z2) - (z1/bet+1./bet/bet)*np.exp(-bet*z1)
+    ak2 = (z2/bet+1./bet**2)*np.exp(-bet*z2) - (z1/bet+1./bet**2)*np.exp(-bet*z1)
     ak3 = (z2/gam+1./gam**2)*np.exp(-gam*z2) - (z1/gam+1./gam**2)*np.exp(-gam*z1)
 
     am1 = (z2**3.-z1**3.)/3.
@@ -124,5 +154,7 @@ def analyt_func(z1, z2):
 
 
 # %% solar constant
+# segment 1
 coef1, coef2 = analyt_func(0.3, 0.7)
+# segment 2
 coef3, coef4 = analyt_func(0.7, 0.865)
