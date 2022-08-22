@@ -4,7 +4,7 @@ c***********************************************
 c                  A. KOKHANOVSKY       
 c                  RETRIEVAL OF SNOW PROPERTIES
 c                  USING OLCI
-c				   version 6.1 
+c				   version 6.0     
 c                  a.a.kokhanovsky@gmail.com
 c                  April 15, 2022               
 c***********************************************
@@ -124,7 +124,7 @@ c     height of the surface (m),TOTAL OZONE load (ECMWF)
         if (IS_IOSTAT_END(istat)) go to 87
         if(toa(1).lt.0.2)         go to 87
         raa=180-(vaa-saa)
-        NCLASS=5
+        isnow=5
         
 c       calculation of OLCI spectral indices - NDSI, NDBI,ratka      
         sk1=toa(17)+toa(21)
@@ -156,18 +156,16 @@ c      escape functions:
                     
 c       cosine of scattering angle:                  
                   co = - cos_sza*cos_vza + sin_sza*sin_vza*cos_raa
-                  THET=acos(co)
-                  theta=THET*180./pi
-                    NCLASS=1
-c     NCLASS=1 - clean 100% snow cover
+                    isnow=1
+c     isnow=1 - clean 100% snow cover
                    
 c******************NOT USED for 100% snow cover:**************                    
 c    the case of 100% snow cover (R(400nm)>0.65):                    
                     if (toa_cal(1).ge.THV0) go to 5021
-                    NCLASS=3
+                    isnow=3
 c     the case of not 100% snow cover:              
 c     scaling factor for patchy snow at 400nm                     
-                    psi=RINFF(cos_sza,cos_vza, THETA)
+                    psi=RINFF(cos_sza,cos_vza)
 c     factor=snow fraction ( SMALLER THAN 1.0):       
                            factor=toa_cal(1)/psi
 c          snow TOA corrected for snow fraction                            
@@ -209,9 +207,7 @@ c     snow reflectance at 620nm in absence of ozone absorption:
 
 c     atmospheric spectral characteristics at 620nm:      
       tauaer_620=aot*(0.62/0.5)**(-anna)
-      taumol_620=0.008735/0.62**(4.08)
-      okota=height/6000.
-      if (okota.gt.0.) taumol_620=taumol_620*exp(-okota)
+      taumol_620=0.0053/0.62**(4.0932)
 
 c      total aerosol optical thickness at 620nm:      
       tau_620=tauaer_620+taumol_620
@@ -240,9 +236,7 @@ c           wavelength(micron):
 c     OLCI CALBRATED TOA REFLECTANCE:            
       reflec= toa_cal_cor(nkl)
       tauaer=aot*(alam/0.5)**(-anna)
-      taumol=0.008735/alam**(4.08)
-      okota=height/6000.
-      if (okota.gt.0.) taumol=taumol*exp(-okota)
+      taumol=0.0053/alam**(4.0932)
       tau=tauaer+taumol
 
 c          asymmetry parameter
@@ -298,9 +292,9 @@ c     at all channels for 100% and partially snow covered pixels:
  9025  continue
 c           pixel classification ( 1- clean, 2-polluted,3-partailly snow covered)
        
-      if (answ2(1).gt.0.98)                    NCLASS=1
-      if (answ2(1).le.0.98.and.factor.gt.0.99) NCLASS=2
-      if (answ2(1).le.0.98.and.factor.le.0.99) NCLASS=3
+      if (answ2(1).gt.0.98)                    isnow=1
+      if (answ2(1).le.0.98.and.factor.gt.0.99) isnow=2
+      if (answ2(1).le.0.98.and.factor.le.0.99) isnow=3
 
 9002      format (i5,3e12.4,f8.4,40e12.4)
 
@@ -371,14 +365,14 @@ c     special case of soot  pollution:
       absor1=0.
       absef660=0.
       absor1000=0.
-      if (powe.lt.0.0) NCLASS=1
+      if (powe.lt.0.0) isnow=1
       if (powe.lt.0.0) polut=0
       if (powe.lt.0.0) powe=0
       if (powe.lt.0.0) go to 1942
       
       aco=2.06e+3
       aload1=polut/aco
-       if (factor.lt.0.99) NCLASS=3
+       if (factor.lt.0.99) isnow=3
        
        if (aload1.le.2.) powe=0.
        if (aload1.le.2.) polut=0.
@@ -406,7 +400,7 @@ c       bottom of atmosphere snow reflectance
 
 c     *************Step 3.4***********************        
 c                   BBA calculation      
-                if (NCLASS.eq.1) go to 8998
+                if (isnow.eq.1) go to 8998
     
 c                   3.4.1. Polluted snow           
 c!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -574,7 +568,7 @@ c       pixel number, latitude, longitude,
         
 c     class ( 1- clean, 2 - polluted, 3-partially snow -covered),
 c     cloud fraction, diameter of grains, SSA, EAL,R0,        
-     c       NCLASS,factor,diam,ssa,al,rv,
+     c       isnow,factor,diam,ssa,al,rv,
         
 c     impurity load (ppm_weight), Angstrom Absorption Exponent,
 c     normalized volumetric absorption coefficient at 1000nm,        
@@ -601,13 +595,13 @@ c    retrieved TOC,ECMWF, TOC difference(%),cv1,cv2
 	 
         if (j.gt.jend) go to 2403
         write(1001,*) j,alat,alon,   
-     c      NCLASS,factor,(albs(ir),ir=1,21)
+     c      isnow,factor,(albs(ir),ir=1,21)
         
         write(1002,*) j,alat,alon,   
-     c       NCLASS,factor,(albp(ir),ir=1,21)
+     c       isnow,factor,(albp(ir),ir=1,21)
           
         write(1003,*) j,alat,alon,   
-     c       NCLASS,factor,(botka(ir),ir=1,21)
+     c       isnow,factor,(botka(ir),ir=1,21)
  2403   continue
 c**************************************************
 c     if (DIFKA.gt.12.0.or. cv2.gt.5.0.or.diam.ge.0.1) go to 932
@@ -615,7 +609,7 @@ c     if (DIFKA.gt.12.0.or. cv2.gt.5.0.or.diam.ge.0.1) go to 932
         
 c     *****    output: postprocessing *****
       write(7004,*) j,alat,alon,   
-     c NCLASS,factor,diam,ssa,al,rv,
+     c isnow,factor,diam,ssa,al,rv,
      c aload1,powe,polut,
      c deff,absor1,absef660,absor1000,
      c rsw,rvis,rnir,rsws,rviss,rnirs,ansi,andbi,
@@ -624,11 +618,11 @@ c     *****    output: postprocessing *****
      c tocos,akozon,difka,cv1,cv2 
          if (j.gt.jend) go to 2404
         write(7001,*) j,alat,alon,   
-     c      NCLASS,factor,(albs(ir),ir=1,21)  
+     c      isnow,factor,(albs(ir),ir=1,21)  
         write(7002,*) j,alat,alon,   
-     c       NCLASS,factor,(albp(ir),ir=1,21)     
+     c       isnow,factor,(albp(ir),ir=1,21)     
         write(7003,*) j,alat,alon,   
-     c       NCLASS,factor,(botka(ir),ir=1,21)
+     c       isnow,factor,(botka(ir),ir=1,21)
 2404    continue      
 932       continue
 87        continue
