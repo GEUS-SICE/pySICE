@@ -184,9 +184,6 @@ c     atmospheric contribution is ignored at 865 amd 1020nm
 c     nonabsorbing snow reflectance
 :        
           r0=toa_cal_cor(17)**eps*toa_cal_cor(21)**(1.-eps)
-		  
-          write(*,*) r0,toa_cal_cor(1),toa_cal_cor(2),eps,toa(1),toa(2),factor,
-     c      toa_cal(1),psi
           rv=r0
       rr2=toa_cal_cor(21)
 	  
@@ -547,9 +544,6 @@ c                                     postprocessing
         DIFKA=abs(difoz)
         ccv2=abs(cv2)
         asinka=inka
-        
-c                     **OUTPUT**
- 3092          format(i5,2x,2e12.4,i3,f8.4,20(2x,f8.4))
           if (powe.lt.0.9)  aload1 =0.0
           if (powe.gt.10.)  powe=   0.0
           if (powe.gt.10.)  aload1= 0.0
@@ -559,44 +553,21 @@ c                     **OUTPUT**
 		
         NBARE=0
         NSNOW=0
-c       dark ice        
+c       NBARE=2 bare ice, NBARE=1 snow
         if (ANDBI.lt.0.65.and. toa(1).lt.0.75)  NBARE=2
-c       clean        
         if (ANDSI.gt.0.33.and. NBARE.NE.2)      NBARE=1
-c          SNOW INDEX            
         if (toa(1).gt.0.75.and.andsi.lt.0.1)   NSNOW=1
         polut=1.e+3*polut
 		
 c     *****    output: no postprocessing *********   
-        write(1004,*)
-c       pixel number, latitude, longitude,
-     c               j,alat,alon,
-        
-c     class ( 1- clean, 2 - polluted, 3-partially snow -covered),
-c     cloud fraction, diameter of grains, SSA, EAL,R0,        
-     c       NCLASS,factor,diam,ssa,al,rv,
-        
-c     impurity load (ppm_weight), Angstrom Absorption Exponent,
-c     normalized volumetric absorption coefficient at 1000nm,        
-     c       aload1,powe,polut,
-c     effective radius of dust grains, volumetric absorption coefficients at 1000nm,
-c     dust mass absorption coefficient at 660 and 1000nm,        
-     c       deff,absor1,absef660,absor1000,
-c      plane visible and NIR BBA        
-     c  rsw, rvis,rnir,
-c      spherical  visible and NIR BBA          
-     c  rsws, rviss,rnirs,
-c      OLCI spectral indices (NDBI,NDSI,OSI)
-     c  andbi,andsi,ratka,
-c      type of pollutants  ( 1-dust, 2- soot)     
-     c      NPOLE,
-c     bare ice index (0-no bare ice, 1-bare ice - clean, 2-bare ice - polluted)
-     c      NBARE,
-c     snow index     (0-no snow, 1- snow)
-     c       NSNOW,
-c     SZA,VZA,RAA, reflectance at channel 1, reflectance at channel 2   
+        write(1004,*)j,alat,alon,        
+     c       NCLASS,factor,diam,ssa,al,rv,        
+     c       aload1,powe,polut,     
+     c       deff,absor1,absef660,absor1000,       
+     c  rsw, rvis,rnir,rsws, rviss,rnirs,
+     c  andbi,andsi,ratka,   
+     c      NPOLE,NBARE,NSNOW, 
      c sza,vza,raa,toa(1),toa(21),
-c    retrieved TOC,ECMWF, TOC difference(%),cv1,cv2
      c       tocos,akozon,difka,cv1,cv2
 	 
         if (j.gt.jend) go to 2403
@@ -609,8 +580,7 @@ c    retrieved TOC,ECMWF, TOC difference(%),cv1,cv2
         write(1003,*) j,alat,alon,   
      c       NCLASS,factor,(botka(ir),ir=1,21)
  2403   continue
-c**************************************************
-c     if (DIFKA.gt.12.0.or. cv2.gt.5.0.or.diam.ge.0.1) go to 932
+
         if (ccv2.gt.THV1.or.diam.lt.THV2.or.DIFKA.gt.THV3) go to 932
         
 c     *****    output: postprocessing *****
@@ -644,7 +614,6 @@ c               MINIMIZATION FUNCTION:
                         r0=rv                                    
                     RFINAL=refatm+tatm*r0*x**z/(1.-albatm*x)
                     fun=reflec-RFINAL
-           write(*, *) x,fun,reflec,rfinal,refatm,tatm,r0,x,z,albatm
 c**********************************                    
                                              return  
                                              end
@@ -811,8 +780,6 @@ c      pause 'zbrent exceeding maximum iterations'
      c alam,reflec,height,aot,anna,pi,rv,tauaer,
      c taumol,gaer,foto
           common /CD/ WELT                         
-c****************************************************
-
                   r0=rv
                     tauaer=aot*(alam/0.5)**(-anna)
                      taumol=0.0053/alam**(4.0932)
@@ -832,7 +799,6 @@ c          asymmetry parameter
                     FOX=1.
                     vv=x/welt
           if (x.gt.0.05)FOX=refatm+tatm*welt*r0*vv**z/(1.-albatm*x*welt)
-c          write(*,*) fox,refatm,tatm,welt,r0,vv,z
                                              return  
                                              end
 
