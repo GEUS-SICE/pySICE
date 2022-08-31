@@ -1,6 +1,6 @@
 [![](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![](https://img.shields.io/badge/License-GPL_v2-blue.svg)](https://github.com/GEUS-SICE/GEUS-SEB-firn-model/blob/main/LICENSE.txt)
-[![](https://img.shields.io/github/issues-raw/GEUS-SICE/GEUS-SEB-firn-model)](https://github.com/GEUS-SICE/pySICE/issues)
+[![](https://img.shields.io/github/issues-raw/GEUS-SICE/pySICE)](https://github.com/GEUS-SICE/pySICE/issues)
 [![](https://img.shields.io/github/v/release/GEUS-SICE/pySICE)](https://github.com/GEUS-SICE/pySICE/releases)
 
 # pySICE
