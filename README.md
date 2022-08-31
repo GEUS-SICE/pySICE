@@ -69,8 +69,9 @@ Input files:
 
 ### Outputs
 
+
 | File Name                            | Description                                                            | Units       |
-|--------------------------------------+------------------------------------------------------------------------+-------------|
+|--------------------------------------|------------------------------------------------------------------------|-------------|
 | grain_diameter.tif                   | Snow grain diameter                                                    | mm          |
 | snow_specific_surface_area.tif       | Snow specific surface area                                             | m^{2}kg^{-1}|
 | albedo_bb_planar_nir.tif             | near infrared broadband planar albedo                                  | 700-2400 nm |
@@ -89,8 +90,10 @@ Input files:
 | 03_SICE.tif                          | total ozone product (OLCI) corrected for ozone scattering              |             |
 
 
+
+
 | Diagnostic Code | Description                                                                                   |
-|-----------------+-----------------------------------------------------------------------------------------------|
+|-----------------|-----------------------------------------------------------------------------------------------|
 |               0 | clean snow                                                                                    |
 |               1 | polluted snow                                                                                 |
 |               3 | partially snow covered pixel                                                                  |
@@ -98,11 +101,13 @@ Input files:
 |               7 | polluted snow of calculated spherical albedo in bands 1 and 2 >0.98 reprocessed as clean snow |
 |             100 | sza<75, no retrival                                                                           |
 |             102 | TOA reflectance at band 21 < 0.1, no retrieval                                                |
-|             103 | TOA reflectance at band 1 < 0.2, no retrieval                                                |
+|             103 | TOA reflectance at band 1 < 0.2, no retrieval                                                 |
 |             104 | grain_diameter < 0.1, no retrieval, potential cloud flag                                      |
 |             105 | retrieved spherical albedo negative in band 1, 2 or 3                                         |
-|              -n | impossible to solve snow spherical albedo equation at band n                                   |
+|              -n | impossible to solve snow spherical albedo equation at band n                                  |
   
+
+
 ![](docs/atbd/SICE_overview1.png)
 
 ### Clean or polluted snow pixels
