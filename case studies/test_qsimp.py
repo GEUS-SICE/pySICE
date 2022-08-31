@@ -7,27 +7,31 @@ Created on Wed Feb 26 16:49:50 2020
 
 #%% Test for integration
 def cube(x):
-    return x**3
+    return x ** 3
 
-def res(a,b):
-    return b**4/4-a**4/4
+
+def res(a, b):
+    return b ** 4 / 4 - a ** 4 / 4
+
+
 a = 0
-b=0.3
+b = 0.3
 
 start_time = time.time()
-test1 = sl.qsimp(cube,a,b)
+test1 = sl.qsimp(cube, a, b)
 print(test1)
 print(time.time() - start_time)
 
 
 start_time = time.time()
-test2 = res(a,b)
+test2 = res(a, b)
 print(test2)
 print(time.time() - start_time)
 
 import scipy.integrate as Integrate
+
 start_time = time.time()
-test3 = Integrate.quad(cube, a,b)
+test3 = Integrate.quad(cube, a, b)
 print(test3)
 print(time.time() - start_time)
 

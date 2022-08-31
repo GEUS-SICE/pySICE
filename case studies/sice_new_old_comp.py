@@ -5,8 +5,8 @@ Created on Sun Mar  1 11:14:55 2020
 @author: bav
 """
 
-#%% 
-folder = 'out/SICE_test_2020_v2/'
+#%%
+folder = "out/SICE_test_2020_v2/"
 import time
 from sice import sice
 
