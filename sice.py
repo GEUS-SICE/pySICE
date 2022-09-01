@@ -82,64 +82,18 @@
 # analyt_func               calculation of surface radiance
 # quad_func                 calculation of quadratic parameters
 # funp                      snow spectral planar and spherical albedo function
-
-
 import numpy as np
-import sice_lib as sl
 import sys
 from sice_io import sice_io, write_output
 import time
 import os
 import xarray as xr
-import numpy as np
 import numba
-from constants_optim import (
-    wls,
-    bai,
-    xa,
-    ya,
-    f0,
-    f1,
-    f2,
-    bet,
-    gam,
-    coef1,
-    coef2,
-    coef3,
-    coef4,
-    thv0,
-)
-from constants_optim import sol1, sol2, sol3, sol1, sol3, asol, bandcoord
+from constants import wls, bai, xa, ya, f0, f1, f2, bet, gam
+from constants import coef1, coef2, coef3, coef4, thv0
+from constants import sol1, sol3, asol, bandcoord
 
 np.seterr(invalid="ignore")
-
-if __name__ == "__main__":
-    # if the script is called from the command line, then parsing the input path and
-    # passing it to the main function
-    InputPath = sys.argv[1]
-    if len(sys.argv) > 3:
-        OutputFolder = sys.argv[2]
-    else:
-        OutputFolder = sys.argv[1] + "/"
-    print(InputPath)
-    print(OutputFolder)
-    print("---")
-
-    OLCI_reader = sice_io(InputPath)
-    OLCI_reader.open()
-    OLCI_scene = OLCI_reader.olci_scene
-
-    start_time = time.process_time()
-
-    # snow = sl.process(OLCI_scene)
-    snow = sl.process_by_chunk(OLCI_scene, chunk_size=500000)
-
-    duration = time.process_time() - start_time
-    print("Time elapsed: ", duration)
-
-    write_output(snow, OutputFolder)
-
-
 os.environ["PYTROLL_CHUNK_SIZE"] = "256"
 
 
@@ -201,6 +155,31 @@ def process_by_chunk(OLCI_scene, chunk_size=150000, compute_polluted=True):
     snow["al"] = xr.concat(al, dim="xy")
     return snow
 
+if __name__ == "__main__":
+    # if the script is called from the command line, then parsing the input path and
+    # passing it to the main function
+    InputPath = sys.argv[1]
+    if len(sys.argv) > 3:
+        OutputFolder = sys.argv[2]
+    else:
+        OutputFolder = sys.argv[1] + "/"
+    print(InputPath)
+    print(OutputFolder)
+    print("---")
+
+    OLCI_reader = sice_io(InputPath)
+    OLCI_reader.open()
+    OLCI_scene = OLCI_reader.olci_scene
+
+    start_time = time.process_time()
+
+    # snow = process(OLCI_scene)
+    snow = process_by_chunk(OLCI_scene, chunk_size=500000)
+
+    duration = time.process_time() - start_time
+    print("Time elapsed: ", duration)
+
+    write_output(snow, OutputFolder)
 
 def view_geometry(OLCI_scene):
     # transfer of OLCI relative azimuthal angle to the definition used in
@@ -747,7 +726,7 @@ def compute_BBA(OLCI_scene, snow, angles, compute_polluted=True):
     # the imaginary part of the refraction index at specified wavelength.
     # This scaling is done in function funp below. Then this function is
     # integrated uing the qsimp method.
-    # BBA_v = np.vectorize(sl.BBA_calc_clean)
+    # BBA_v = np.vectorize(BBA_calc_clean)
     # p1,p2,s1,s2 = BBA_v(al[ind_all_clean], u1[ind_all_clean])
     #
     # visible(0.3-0.7micron)
@@ -792,8 +771,8 @@ def compute_BBA(OLCI_scene, snow, angles, compute_polluted=True):
         ind_pol = (snow.isnow == 2) | (snow.isnow == 3)
         iind_pol = dict(xy=np.arange(len(ind_pol))[ind_pol])
 
-        # rp1[iind_pol], rp2[iind_pol], rp3[iind_pol] = sl.BBA_calc_pol(rp[iind_pol], asol, sol1, sol2, sol3)
-        # rs1[iind_pol], rs2[iind_pol], rs3[iind_pol] = sl.BBA_calc_pol(alb_sph[iind_pol], asol, sol1, sol2, sol3)
+        # rp1[iind_pol], rp2[iind_pol], rp3[iind_pol] = BBA_calc_pol(rp[iind_pol], asol, sol1, sol2, sol3)
+        # rs1[iind_pol], rs2[iind_pol], rs3[iind_pol] = BBA_calc_pol(alb_sph[iind_pol], asol, sol1, sol2, sol3)
         _, _, snow.rp3[iind_pol] = BBA_calc_pol(
             snow.rp[iind_pol].values.T, asol, sol1, sol2, sol3
         )
@@ -845,7 +824,6 @@ def funp(x, al, sph_calc, u1):
 
 def BBA_calc_clean(al, u1):
     # CalCULATION OF BBA of clean snow
-
     # Original method: Recalculating spectrum and integrating it.
     # This is the exact, but slow mehtod to calculate clean snow BBA.
     # For each clean pixel, the derived spectrum is caluclated from u1, al and

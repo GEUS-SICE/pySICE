@@ -17,26 +17,22 @@ import rasterio as rio
 import time
 import os
 import sys
-import bav_lib as bl
+#import bav_lib as bl
 import pandas as pd
+import rioxarray
 
 start_time = time.time()
 
-InputFolder = sys.argv[1] + "/"
-# InputFolder = 'out/SICE_2020_py1.4/'
+#InputFolder = sys.argv[1] + "/"
+InputFolder = './data/5_km_res/'
+OutputFolder = './data/5_km_res/fortran/'
+ProcessingFolder = './fortran/'
 
-print(os.getcwd())
-
-
-#%% turning geotiffs into sice input
-print("Reading input ")
-print(sys.argv[1])
-
-#%% input text file
-if os.path.isfile(sys.argv[1]):
-    InputFolder = os.path.dirname(sys.argv[1]) + "/"
+# input text file
+if os.path.isfile(InputFolder):
+    InputFolder = os.path.dirname(InputFolder) + "/"
     # data_in = pd.read_csv('validation/data/S3_PROMICE.csv')
-    data_in = pd.read_csv(sys.argv[1])
+    data_in = pd.read_csv(InputFolder)
     toa = np.expand_dims(
         data_in[[c for c in data_in.columns if c.find("reflec") >= 0]]
         .to_numpy()
@@ -57,10 +53,10 @@ if os.path.isfile(sys.argv[1]):
     vza[np.isnan(toa[0, :, :])] = np.nan
     vaa[np.isnan(toa[0, :, :])] = np.nan
 
-#%% ========= input tif ===============
-elif os.path.isdir(sys.argv[1]):
+#  input tif 
+elif os.path.isdir(InputFolder):
     print("\n tiff input")
-    InputFolder = sys.argv[1] + "/"
+    InputFolder = InputFolder + "/"
     Oa01 = rio.open(InputFolder + "r_TOA_01.tif")
     meta = Oa01.meta
 
@@ -89,25 +85,27 @@ elif os.path.isdir(sys.argv[1]):
     vza[np.isnan(toa[0, :, :])] = np.nan
     vaa[np.isnan(toa[0, :, :])] = np.nan
 
-# ns,alat,alon,sza,vza,saa,vaa,height,  (toa(iks),iks=1,21),OZON,WATER
+#  New format
+
 olci_toa = np.vstack(
     (
-        np.arange(1, len(sza.flatten()) + 1),
-        sza.flatten() * np.nan,
-        sza.flatten() * np.nan,
-        sza.flatten(),
-        vza.flatten(),
-        saa.flatten(),
-        vaa.flatten(),
-        height.flatten(),
+        np.arange(1, len(sza.flatten()) + 1),  # pixel number_x
+        np.arange(1, len(sza.flatten()) + 1),  # pixel number_y
+        np.arange(1, len(sza.flatten()) + 1),  # latitude
+        np.arange(1, len(sza.flatten()) + 1),  # longitude
+        sza.flatten(),  # solar zenith angle
+        saa.flatten(),  # soalr azimuthal angle
+        vza.flatten(),  # viewing zenith angle
+        vaa.flatten(),  # viewing azimuth angle
     )
 )
-
+# 21 OLCI TOA reflectances (pi*I/cos(sza)/F0,
 for i in range(21):
     olci_toa = np.vstack((olci_toa, toa[i, :, :].flatten()))
-
+# height of the surface (m)
+olci_toa = np.vstack((olci_toa, height.flatten())) 
+# TOTAL OZONE load (ECMWF)
 olci_toa = np.vstack((olci_toa, ozone.flatten()))
-olci_toa = np.vstack((olci_toa, water.flatten()))
 
 olci_toa = olci_toa.T
 olci_toa_save = olci_toa
@@ -116,101 +114,66 @@ olci_toa = olci_toa[ind_good_pixels, :]
 olci_toa[np.isnan(olci_toa)] = 999
 OutputFolder = InputFolder + "fortran/"
 # os.mkdir(OutputFolder)
-print("\nInput file saved: " + OutputFolder + "olci_toa_newformat.dat")
+print("\nInput file saved: " + OutputFolder + "input.dat")
 np.savetxt(
-    OutputFolder + "olci_toa_newformat.dat",
+    OutputFolder + "input.dat",
     X=olci_toa,
     delimiter="\t",
-    fmt="%i " + "%10.5f " * 6 + "%i " + "%10.5f" * 23,
+    fmt="%i "*2 + "%10.5f " * 29,
 )
 
 #%%  You can now run sice.f
-# print('bash ./fortran/sice_f.sh -i '+OutputFolder)
-# os.system('bash ./fortran/sice_f.sh -i '+OutputFolder)
+import shutil
+import glob
 
-cmnd = "bash ./fortran/sice_f.sh -i " + OutputFolder
-print(cmnd)
-import subprocess
+shutil.copy(OutputFolder+'input.dat', ProcessingFolder[:-1])
+os.chdir('./fortran')
+subprocess.check_call('./sice.exe')
+for file in glob.glob(r'*.dat'):
+    if file == 'thv.dat':
+        continue
+    if file == 'input.dat':
+        continue
+    
+    print('Moving '+file)
+    shutil.move(file, '../'+OutputFolder)
+os.chdir('..')
 
-try:
-    output = subprocess.check_output(
-        cmnd, stderr=subprocess.STDOUT, shell=True, universal_newlines=True
-    )
-except subprocess.CalledProcessError as exc:
-    print("Status : FAIL", exc.returncode, exc.output)
-else:
-    print("Output: \n{}\n".format(output))
 
 #%% Loading result from sice_debug.f
-# OUTPUT files:
-#  file= 'spherical_albedo.dat' )           ns,ndate(3),alat,alon,(answer(i),i=1,21),isnow
-#  file= 'planar_albedo.dat'     )          ns,ndate(3),alat,alon,(rp(i),i=1,21),isnow
-#  file= 'boar.dat'                    )    ns,ndate(3),alat,alon,(refl(i),i=1,21),isnow
-#  file= 'size.dat'                     )   ns,ndate(3),alat,alon,D,area,al,r0, andsi,andbi,indexs,indexi,indexd,isnow
-#  file=   'impurity.dat'              )    ns,ndate(3),alat,alon,ntype,conc,bf,bm,thv, toa(1),isnow
-#  file=   'bba.dat'                     )  ns,ndate(3),alat,alon,rp3,rs3, isnow
-#  file=   'bba_alex_reduced.dat')          ns,ndate(3),rp3,isnow
-#  file=   'notsnow.dat')                   ns,ndate(3),icloud,iice
-#  file='retrieved_O3.dat')                 ns,alat,alon,BXXX,totadu,deltak,sza,vza,amf
 
-if os.path.isfile(sys.argv[1]):
-    impurity = pd.read_csv(
-        OutputFolder + "impurity.dat",
+
+#WRITE(1004,*)
+#     c               j,alat,alon,
+#     c       NCLASS,factor,diam,ssa,dlina,rv,
+#     c       aload1,powe,polut,
+#     c       deff,absor1,absef660,absor1000,
+#     c rsw,
+#     c  rvis,rnir,
+#     c  rsws,
+#     c  rviss,rnirs,
+#     c  andbi,andsi,ratka,
+#     c      NPOLE,
+#     c      NBARE,
+#     c       NSNOW,
+#     c sza,vza,raa,toa(1),toa(21),
+#     c       tocos,akozon,difka,cv1,cv2
+if os.path.isfile(InputFolder):
+    snow_parameters = pd.read_csv(
+        OutputFolder + "snow_parameters.dat",
         names=[
-            "ns",
-            "ndate",
-            "alat",
-            "alon",
-            "ntype",
-            "conc",
-            "bf",
-            "bm",
-            "thv",
-            "toa(1)",
-            "isnow",
+            "j", "alat", "alon", "NCLASS",
+            "factor", "diam", "ssa", "dlina", "rv", "aload1",
+            "powe", "polut", "eff","absor1","absef660","absor1000",
+            "rsw", "rvis","rnir", "rsws", "rviss","rnirs",
+            "andbi","andsi","ratka", "NPOLE",
+            "NBARE", "NSNOW", "sza","vza","raa","toa(1)","toa(21)",
+            "tocos","akozon","difka","cv1","cv2"
         ],
         sep=" ",
         skipinitialspace=True,
         header=None,
     )
-    size = pd.read_csv(
-        OutputFolder + "size.dat",
-        names=[
-            "ns",
-            "ndate",
-            "alat",
-            "alon",
-            "D",
-            "area",
-            "al",
-            "r0",
-            "andsi",
-            "andbi",
-            "indexs",
-            "indexi",
-            "indexd",
-            "isnow",
-        ],
-        sep=" ",
-        skipinitialspace=True,
-        header=None,
-    )
-    bba = pd.read_csv(
-        OutputFolder + "bba.dat",
-        names=["ns", "ndate", "alat", "alon", "rp3", "rs3", "isnow"],
-        sep=" ",
-        skipinitialspace=True,
-        header=None,
-    )
-    spherical_albedo = pd.read_csv(
-        OutputFolder + "spherical_albedo.dat",
-        sep=" ",
-        skipinitialspace=True,
-        header=None,
-    ).values
-    planar_albedo = pd.read_csv(
-        OutputFolder + "planar_albedo.dat", sep=" ", skipinitialspace=True, header=None
-    ).values
 
     data_out = data_in
     data_out["grain_diameter"] = np.nan
@@ -255,11 +218,11 @@ if os.path.isfile(sys.argv[1]):
             :, 4 + i
         ]
 
-    data_out.to_csv(sys.argv[1][:-4] + "_fortran_out.csv")
-    print("\nOutput: " + sys.argv[1][:-4] + "_fortran_out.csv")
+    data_out.to_csv(InputFolder[:-4] + "_fortran_out.csv")
+    print("\nOutput: " + InputFolder[:-4] + "_fortran_out.csv")
 
 # ========= input tif ===============
-elif os.path.isdir(sys.argv[1]):
+elif os.path.isdir(InputFolder):
     Oa01 = rio.open(InputFolder + "r_TOA_01.tif")
     meta = Oa01.meta
     with rio.Env():
