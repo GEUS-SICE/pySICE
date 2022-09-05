@@ -331,12 +331,15 @@ def write_output(snow, OutputFolder):
         "area": "snow_specific_area",
         "al": "al",
         "r0": "r0",
-        "isnow": "diagnostic_retrieval",
+        "isnow": "isnow",
         "conc": "conc",
         "rp3": "albedo_bb_planar_sw",
         "rs3": "albedo_bb_spherical_sw",
+        "factor": "factor",
     }
-    for var in ["diameter", "area", "rp3", "rs3", "isnow", "r0", "al"]:
+    print('Printing out:')
+    for var in ["diameter", "area", "rp3", "rs3", "isnow", "r0", "al", 'factor']:
+        print(var)
         snow[var].unstack(dim="xy").transpose("y", "x").rio.to_raster(
             os.path.join(OutputFolder, file_name_list[var] + ".tif")
         )

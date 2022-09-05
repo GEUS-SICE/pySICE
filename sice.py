@@ -91,95 +91,11 @@ import xarray as xr
 import numba
 from constants import wls, bai, xa, ya, f0, f1, f2, bet, gam
 from constants import coef1, coef2, coef3, coef4, thv0
-from constants import sol1, sol3, asol, bandcoord
+from constants import sol1, sol2, sol3, asol, bandcoord
 
 np.seterr(invalid="ignore")
 os.environ["PYTROLL_CHUNK_SIZE"] = "256"
 
-
-def process(OLCI_scene, compute_polluted=True, **kwargs):
-    angles = view_geometry(OLCI_scene)
-    # OLCI_scene = ozone_correction(OLCI_scene)
-    OLCI_scene, snow = prepare_processing(OLCI_scene, angles)
-    aerosol = aerosol_properties(OLCI_scene.elevation, angles.cos_sa, aot=0.07)
-    OLCI_scene, angles, snow = snow_properties(OLCI_scene, angles, snow)
-    atmosphere = prepare_coef(aerosol, angles)
-
-    # first guess for the snow spherical albedo
-    OLCI_scene, snow = snow_albedo_solved(OLCI_scene, angles, aerosol, atmosphere, snow)
-
-    # retrieving snow impurities
-    impurities = snow_impurities(snow.alb_sph, snow.bal)
-
-    OLCI_scene, snow = snow_albedo_direct(
-        OLCI_scene, angles, aerosol, atmosphere, snow, impurities
-    )
-
-    snow = compute_BBA(OLCI_scene, snow, angles, compute_polluted=compute_polluted)
-    return snow
-
-
-def process_by_chunk(OLCI_scene, chunk_size=150000, compute_polluted=True):
-    size = OLCI_scene.sza.shape[0]
-    nchunks = int(max(np.floor(size / chunk_size), 1))
-    OLCI_chunks = OLCI_scene.chunk({"band": 21, "xy": chunk_size})
-    # snow_chunks = OLCI_chunks.map_blocks(process,kwargs={}, template = snow_template)
-    xy_chunk_indexes = np.array(OLCI_chunks.chunks["xy"]).cumsum()
-
-    diameter = []
-    area = []
-    rp3 = []
-    rs3 = []
-    isnow = []
-    r0 = []
-    al = []
-    for i in range(len(xy_chunk_indexes) - 1):
-        print(f"{i+1} / {nchunks}")
-        chunk = OLCI_scene.isel(xy=slice(xy_chunk_indexes[i], xy_chunk_indexes[i + 1]))
-        snow_chunk = process(chunk)
-        diameter.append(snow_chunk.diameter)
-        area.append(snow_chunk.area)
-        rp3.append(snow_chunk.rp3)
-        rs3.append(snow_chunk.rs3)
-        isnow.append(snow_chunk.isnow)
-        r0.append(snow_chunk.r0)
-        al.append(snow_chunk.r0)
-        del snow_chunk
-    snow = xr.Dataset()
-    snow["diameter"] = xr.concat(diameter, dim="xy")
-    snow["area"] = xr.concat(area, dim="xy")
-    snow["rp3"] = xr.concat(rp3, dim="xy")
-    snow["rs3"] = xr.concat(rs3, dim="xy")
-    snow["isnow"] = xr.concat(isnow, dim="xy")
-    snow["r0"] = xr.concat(r0, dim="xy")
-    snow["al"] = xr.concat(al, dim="xy")
-    return snow
-
-if __name__ == "__main__":
-    # if the script is called from the command line, then parsing the input path and
-    # passing it to the main function
-    InputPath = sys.argv[1]
-    if len(sys.argv) > 3:
-        OutputFolder = sys.argv[2]
-    else:
-        OutputFolder = sys.argv[1] + "/"
-    print(InputPath)
-    print(OutputFolder)
-    print("---")
-
-    OLCI_reader = sice_io(InputPath)
-    OLCI_reader.open()
-    OLCI_scene = OLCI_reader.olci_scene
-
-    start_time = time.process_time()
-
-    # snow = process(OLCI_scene)
-    snow = process_by_chunk(OLCI_scene, chunk_size=500000)
-
-    duration = time.process_time() - start_time
-    print("Time elapsed: ", duration)
-
-    write_output(snow, OutputFolder)
 
 def view_geometry(OLCI_scene):
     # transfer of OLCI relative azimuthal angle to the definition used in
@@ -273,9 +189,11 @@ def rinff(cos_sza, cos_vza, theta):
 def prepare_processing(OLCI_scene, angles):
     # Filtering pixels unsuitable for retrieval
     snow = xr.Dataset()
-    snow["isnow"] = xr.where(OLCI_scene.toa[20] < 0.1, 102, np.nan)
-    snow.isnow[OLCI_scene.toa[0] < 0.2] = 103
-    snow.isnow[OLCI_scene.sza > 75] = 100
+    snow["isnow"] = OLCI_scene['sza']*np.nan
+    # snow["isnow"] = xr.where(OLCI_scene.toa[20] < 0.1, 102, np.nan)
+    snow["isnow"] = xr.where(OLCI_scene['sza'].isnull(), 999, np.nan)
+    # snow.isnow[OLCI_scene.toa[0] < 0.2] = 103
+    # snow.isnow[OLCI_scene.sza > 75] = 100
 
     mask = np.isnan(snow.isnow)
     OLCI_scene["toa"] = OLCI_scene.toa.where(mask)
@@ -294,17 +212,19 @@ def prepare_processing(OLCI_scene, angles):
     )
 
     # case of not 100% snow cover:
-    msk = OLCI_scene.toa[0] < thv0
+    msk = OLCI_scene.toa.sel(band=0) < thv0
     snow.isnow[msk] = 3
     snow.isnow[~msk] = 1
     # scaling factor for patchy snow at 400nm
     psi = rinff(angles["cos_sza"], angles["cos_vza"], angles["theta"])
     # factor=snow fraction ( SMALLER THAN 1.0):
-    snow["factor"] = OLCI_scene.toa[0] / psi
+    snow["factor"] = xr.where(msk, OLCI_scene.toa.sel(band=0) / psi, 1)
 
     # snow TOA corrected for snow fraction
-    OLCI_scene["toa_cor"] = xr.where(
-        msk, OLCI_scene["toa"] / snow["factor"], OLCI_scene["toa"]
+    OLCI_scene["toa"] = xr.where(
+        msk, 
+        OLCI_scene["toa"] / snow["factor"], 
+        OLCI_scene["toa"]
     )
     return OLCI_scene, snow
 
@@ -384,8 +304,8 @@ def snow_properties(OLCI_scene, angles, snow):
     # filtering small D
     diameter_thresh = 0.1
 
-    valid = D >= diameter_thresh
-    snow.isnow[~valid & np.isnan(snow.isnow)] = 104
+    valid = D >= 0  # diameter_thresh
+    # snow.isnow[~valid & np.isnan(snow.isnow)] = 104
     OLCI_scene["toa"] = OLCI_scene.toa.where(valid)
     snow["diameter"] = D.where(valid)
     snow["area"] = area.where(valid)
@@ -578,12 +498,12 @@ def snow_albedo_solved(OLCI_scene, angles, aerosol, atmosphere, snow):
     iind_solved = dict(xy=np.arange(len(ind_solved))[ind_solved])
     snow.alb_sph[iind_solved] = 1
 
-    def solver_wrapper(toa_cor_o3, tau, t1t2, r0, u1, u2, albatm, r):
+    def solver_wrapper(toa, tau, t1t2, r0, u1, u2, albatm, r):
         # it is assumed that albedo is in the range 0.1-1.0
         return zbrent(
             0.1,
             1,
-            args=(t1t2, r0, u1, u2, albatm, r, toa_cor_o3),
+            args=(t1t2, r0, u1, u2, albatm, r, toa),
             max_iter=30,
             tolerance=2e-4,
         )
@@ -602,8 +522,12 @@ def snow_albedo_solved(OLCI_scene, angles, aerosol, atmosphere, snow):
             atmosphere.albatm.sel(band=i_channel)[iind_solved],
             atmosphere.r.sel(band=i_channel)[iind_solved],
         )
-        ind_bad = snow.alb_sph.sel(band=i_channel) == -999
-        snow["isnow"] = xr.where(ind_bad, -i_channel, snow.isnow)
+        # ind_bad = snow.alb_sph.sel(band=i_channel) == -999
+        # snow["isnow"] = xr.where(ind_bad, -i_channel, snow.isnow)
+        ind_bad = snow.alb_sph.sel(band=i_channel) < 0
+        snow.alb_sph.sel(band=i_channel).values = xr.where(ind_bad, 
+                                                    1, 
+                                                    snow.alb_sph.sel(band=i_channel))
     # some filtering
     snow["alb_sph"] = snow.alb_sph.where(snow.isnow >= 0)
     ind_neg_alb = (
@@ -612,15 +536,16 @@ def snow_albedo_solved(OLCI_scene, angles, aerosol, atmosphere, snow):
         | (snow.alb_sph.sel(band=2) < 0)
     )
     snow["alb_sph"] = xr.where(ind_neg_alb, np.nan, snow["alb_sph"])
-    snow["isnow"] = xr.where(ind_neg_alb, 105, snow.isnow)
+    # snow["isnow"] = xr.where(ind_neg_alb, 105, snow.isnow)
 
     # correcting the retrived spherical albedo for fractional snow cover
-    snow["alb_sph"] = snow["factor"] * snow["alb_sph"]
+    # snow["alb_sph"] = snow["factor"] * snow["alb_sph"]
     snow["rp"] = snow.alb_sph ** angles.u1
     snow["refl"] = (
         snow.factor * snow.r0 * snow.alb_sph ** (angles.u1 * angles.u2 / snow.r0)
     )
 
+    ind_no_nan = snow["isnow"]!=999
     snow["isnow"] = xr.where(snow.alb_sph.sel(band=0) > 0.98, 1, snow.isnow)
     snow["isnow"] = xr.where(
         (snow.alb_sph.sel(band=0) <= 0.98) & (snow.factor > 0.99), 2, snow.isnow
@@ -628,14 +553,15 @@ def snow_albedo_solved(OLCI_scene, angles, aerosol, atmosphere, snow):
     snow["isnow"] = xr.where(
         (snow.alb_sph.sel(band=0) <= 0.98) & (snow.factor <= 0.99), 3, snow.isnow
     )
+    snow["isnow"] = snow["isnow"].where(ind_no_nan)
     return OLCI_scene, snow
 
 
 @numba.jit(nopython=True, cache=True)
-def f(albedo, t1t2, r0, u1, u2, albatm, r, toa_cor_o3):
+def f(albedo, t1t2, r0, u1, u2, albatm, r, toa):
     surf = t1t2 * r0 * albedo ** (u1 * u2 / r0) / (1 - albedo * albatm)
     rs = r + surf
-    return toa_cor_o3 - rs
+    return toa - rs
 
 
 @numba.jit(nopython=True, cache=True)
@@ -977,3 +903,90 @@ def quad_func(x0, x1, x2, y0, y1, y2):
     c1 = y0 / d1 + y1 / d2 + y2 / d3
     sa = a1 + b1 * x1 + c1 * x1 * x1
     return sa, a1, b1, c1
+
+
+def process(OLCI_scene, compute_polluted=True, **kwargs):
+    angles = view_geometry(OLCI_scene)
+    # OLCI_scene = ozone_correction(OLCI_scene)
+    OLCI_scene, snow = prepare_processing(OLCI_scene, angles)
+    aerosol = aerosol_properties(OLCI_scene.elevation, angles.cos_sa, aot=0.07)
+    OLCI_scene, angles, snow = snow_properties(OLCI_scene, angles, snow)
+    atmosphere = prepare_coef(aerosol, angles)
+
+    # first guess for the snow spherical albedo
+    OLCI_scene, snow = snow_albedo_solved(OLCI_scene, angles, aerosol, atmosphere, snow)
+
+    # retrieving snow impurities
+    impurities = snow_impurities(snow.alb_sph, snow.bal)
+
+    OLCI_scene, snow = snow_albedo_direct(
+        OLCI_scene, angles, aerosol, atmosphere, snow, impurities
+    )
+
+    snow = compute_BBA(OLCI_scene, snow, angles, compute_polluted=compute_polluted)
+    return snow
+
+
+def process_by_chunk(OLCI_scene, chunk_size=150000, compute_polluted=True):
+    size = OLCI_scene.sza.shape[0]
+    nchunks = int(max(np.floor(size / chunk_size), 1))
+    OLCI_chunks = OLCI_scene.chunk({"band": 21, "xy": chunk_size})
+    # snow_chunks = OLCI_chunks.map_blocks(process,kwargs={}, template = snow_template)
+    xy_chunk_indexes = np.array(OLCI_chunks.chunks["xy"]).cumsum()
+
+    diameter = []
+    area = []
+    rp3 = []
+    rs3 = []
+    isnow = []
+    r0 = []
+    al = []
+    for i in range(len(xy_chunk_indexes) - 1):
+        print(f"{i+1} / {nchunks}")
+        chunk = OLCI_scene.isel(xy=slice(xy_chunk_indexes[i], xy_chunk_indexes[i + 1]))
+        snow_chunk = process(chunk)
+        diameter.append(snow_chunk.diameter)
+        area.append(snow_chunk.area)
+        rp3.append(snow_chunk.rp3)
+        rs3.append(snow_chunk.rs3)
+        isnow.append(snow_chunk.isnow)
+        r0.append(snow_chunk.r0)
+        al.append(snow_chunk.r0)
+        del snow_chunk
+    snow = xr.Dataset()
+    snow["diameter"] = xr.concat(diameter, dim="xy")
+    snow["area"] = xr.concat(area, dim="xy")
+    snow["rp3"] = xr.concat(rp3, dim="xy")
+    snow["rs3"] = xr.concat(rs3, dim="xy")
+    snow["isnow"] = xr.concat(isnow, dim="xy")
+    snow["r0"] = xr.concat(r0, dim="xy")
+    snow["al"] = xr.concat(al, dim="xy")
+    return snow
+
+if __name__ == "__main__":
+    # if the script is called from the command line, then parsing the input path and
+    # passing it to the main function
+    InputPath = sys.argv[1]
+    if len(sys.argv) >= 3:
+        OutputFolder = sys.argv[2]
+    else:
+        OutputFolder = sys.argv[1] + "/"
+    print('Start sice.py')
+    print('Input folder:', InputPath)
+    print('Output folder:', OutputFolder)
+
+    OLCI_reader = sice_io(InputPath)
+    OLCI_reader.open()
+    OLCI_scene = OLCI_reader.olci_scene
+
+    start_time = time.process_time()
+
+    snow = process(OLCI_scene)
+    # snow = process_by_chunk(OLCI_scene, chunk_size=500000)
+
+    duration = time.process_time() - start_time
+    print("Time elapsed: ", duration)
+
+    write_output(snow, OutputFolder)
+    snow.alb_sph.sel(band=0).unstack(dim="xy").transpose("y", "x").rio.to_raster(OutputFolder+'/alb_sph_01.tif')
+    snow.alb_sph_direct.sel(band=0).unstack(dim="xy").transpose("y", "x").rio.to_raster(OutputFolder+'/alb_sph_direct_01.tif')
