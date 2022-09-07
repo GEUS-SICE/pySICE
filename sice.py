@@ -1,6 +1,6 @@
 # pySICEv2.0
 #
-# from FORTRAN VERSION 6.0
+# from FORTRAN VERSION 6.2
 # Apr. 2022
 #
 # This code retrieves snow/ice  albedo and related snow products for clean Arctic
@@ -90,8 +90,7 @@ import os
 import xarray as xr
 import numba
 from constants import wls, bai, xa, ya, f0, f1, f2, bet, gam
-from constants import coef1, coef2, coef3, coef4, thv0
-from constants import sol1, sol2, sol3, asol, bandcoord
+from constants import thv0, sol1, sol2, sol3, asol
 
 np.seterr(invalid="ignore")
 os.environ["PYTROLL_CHUNK_SIZE"] = "256"
@@ -131,45 +130,6 @@ def view_geometry(OLCI_scene):
     angles["cos_sa"] = cos_sa
     angles["theta"] = theta
     return angles
-
-
-def ozone_correction(OLCI_scene, write_ozone=False):
-    # water and ozone spectral optical density
-    # water_vod = genfromtxt('./tg_water_vod.dat', delimiter='   ')
-    # self.voda = xr.DataArray(water_vod[0:21, 1], coords=[bandcoord])
-    ozone_vod = np.genfromtxt("./tg_vod.dat", delimiter="   ")
-    tozon = xr.DataArray(ozone_vod[0:21, 1], coords=[bandcoord])
-
-    # update 2022: no ozone correction
-    # OLCI_scene['BXXX'], OLCI_scene['toa'] = molecular_absorption(OLCI_scene.ozone, tozon, OLCI_scene.sza, OLCI_scene.vza, OLCI_scene.toa)
-    OLCI_scene.drop("ozone")  # don't use anymore
-    return OLCI_scene
-
-
-def molecular_absorption(ozone, tozon, sza, vza, toa):
-    # Correcting TOA reflectance for ozone absorption
-    eps = 1.55
-    # ecmwf ozone from OLCI file (in Kg.m-2) to DOBSON UNITS
-    # 1 kg O3 / m2 = 46696.24  DOBSON Unit (DU)
-    totadu = 46696.24 * ozone
-
-    inv_cos_za = 1.0 / np.cos(np.deg2rad(sza)) + 1.0 / np.cos(np.deg2rad(vza))
-
-    BX = (toa.sel(band=20) ** (1 - eps)) * (toa.sel(band=16) ** eps) / toa.sel(band=6)
-    BXXX = np.log(BX) / 1.11e-4 / inv_cos_za
-    BXXX = BXXX.where((BXXX >= 0) & (BXXX <= 500), 999)
-
-    # bav 09-02-2020: now water scattering not accounted for
-    # kg/m**2. transfer to mol/cm**2
-    #    roznov = 2.99236e-22  # 1 moles Ozone = 47.9982 grams
-    # water vapor optical depth
-    #    vap = water/roznov
-    #    AKOWAT = vap/3.847e+22#    tvoda = np.exp(inv_cos_za*voda*AKOWAT)
-
-    # tvoda = tozon * 0 + 1
-    tvoda = 1
-    toa_cor_o3 = toa * tvoda * np.exp(inv_cos_za * tozon * totadu / 404.59)
-    return BXXX, toa_cor_o3
 
 
 def rinff(cos_sza, cos_vza, theta):
@@ -229,7 +189,50 @@ def prepare_processing(OLCI_scene, angles):
     return OLCI_scene, snow
 
 
-def aerosol_properties(height, cos_sa, aot=0.1):
+def snow_properties(OLCI_scene, angles, snow):
+    # retrieval of snow properties ( R_0, size of grains from OLCI channels 865[17] and 1020nm[21] assumed not influenced by atmospheric scattering and absorption processes)
+    # imaginary part of the ice refractive index at 865 and 1020nm
+    akap3 = 2.40e-7
+    akap4 = 2.25e-6
+    # bulk absoprtion coefficient of ice at 1020nm
+    alt3 = 4.0 * np.pi * akap3 / 0.865
+    alt4 = 4.0 * np.pi * akap4 / 1.02
+    eps = 1/(1-np.sqrt(alt3/alt4))
+    # consequently: 1-eps = 1/(1-np.sqrt(alpha2/alpha1))
+
+    # reflectivity of nonabsorbing snow layer
+    rr1 = OLCI_scene.toa.sel(band=16)
+    rr2 = OLCI_scene.toa.sel(band=20)
+    r0 = (rr1 ** eps) * (rr2 ** (1.0 - eps))
+
+    # effective absorption length(mm)
+    bal = (np.log(rr2 / r0) / (angles.u1 * angles.u2 / r0)) ** 2 / alt4
+    al = bal / 1000.0
+
+    # effective grain size(mm):diameter
+    # xi/(1-g) = 9.2
+    # D = al/(9.2*16/9)
+    D = al / 16
+    # snow specific area ( dimension: m*m/kg)
+    # area = 6./D/0.917
+    area = 104.7 / al
+
+    # filtering small D
+    # diameter_thresh = 0.1
+
+    valid = D >= 0  # diameter_thresh
+    # snow.isnow[~valid & np.isnan(snow.isnow)] = 104
+    OLCI_scene["toa"] = OLCI_scene.toa.where(valid)
+    snow["diameter"] = D.where(valid)
+    snow["area"] = area.where(valid)
+    snow["al"] = al.where(valid)
+    snow["r0"] = r0.where(valid)
+    snow["bal"] = bal.where(valid)
+    angles = angles.where(valid)
+    return OLCI_scene, angles, snow
+
+
+def aerosol_properties(height, cos_sa, aot=0.07):
     # Atmospheric optical thickness
     tauaer = aot * (wls / 0.5) ** (-1.3)
     # gaer = g0 + g1 * np.exp(-wls / wave0)
@@ -239,7 +242,10 @@ def aerosol_properties(height, cos_sa, aot=0.1):
     # 2021 version:
     # taumol = wls**(-4.05) * np.minimum(1, np.exp(-height / 7400)) * 0.00877
     # MOLEC = 1 version:
-    taumol = 0.008735 * wls ** (-4.08) * np.minimum(1, np.exp(-height / 6000))
+    taumol = 0.008735 * wls ** (-4.08)
+    taumol = xr.where((height/6000)>0,
+                      taumol*np.exp(height / 6000),
+                      taumol)
     # MOLEC = 0 version:
     # taumol=0.0053/wls**(4.0932)
 
@@ -271,51 +277,6 @@ def aerosol_properties(height, cos_sa, aot=0.1):
     return aerosol
 
 
-def snow_properties(OLCI_scene, angles, snow):
-    # retrieval of snow properties ( R_0, size of grains from OLCI channels 865[17] and 1020nm[21] assumed not influenced by atmospheric scattering and absorption processes)
-    # imaginary part of the ice refractive index at 865 and 1020nm
-    akap3 = 2.40e-7
-    akap4 = 2.25e-6
-    # bulk absoprtion coefficient of ice at 1020nm
-    alt3 = 4.0 * np.pi * akap3 / 0.865
-    alt4 = 4.0 * np.pi * akap4 / 1.02
-
-    # eps = 1/(1-np.sqrt(alt3/alt4))
-    eps = 1.549559365010611
-    # consequently: 1-eps = 1/(1-np.sqrt(alpha2/alpha1))
-
-    # reflectivity of nonabsorbing snow layer
-    rr1 = OLCI_scene.toa.sel(band=16)
-    rr2 = OLCI_scene.toa.sel(band=20)
-    r0 = (rr1 ** eps) * (rr2 ** (1.0 - eps))
-
-    # effective absorption length(mm)
-    bal = (np.log(rr2 / r0) / (angles.u1 * angles.u2 / r0)) ** 2 / alt4
-    al = bal / 1000.0
-
-    # effective grain size(mm):diameter
-    # xi/(1-g) = 9.2
-    # D = al/(9.2*16/9)
-    D = al / 16
-    # snow specific area ( dimension: m*m/kg)
-    # area = 6./D/0.917
-    area = 104.7 / al
-
-    # filtering small D
-    diameter_thresh = 0.1
-
-    valid = D >= 0  # diameter_thresh
-    # snow.isnow[~valid & np.isnan(snow.isnow)] = 104
-    OLCI_scene["toa"] = OLCI_scene.toa.where(valid)
-    snow["diameter"] = D.where(valid)
-    snow["area"] = area.where(valid)
-    snow["al"] = al.where(valid)
-    snow["r0"] = r0.where(valid)
-    snow["bal"] = bal.where(valid)
-    angles = angles.where(valid)
-    return OLCI_scene, angles, snow
-
-
 def prepare_coef(aerosol, angles):
     args = (
         aerosol.tau,
@@ -328,8 +289,8 @@ def prepare_coef(aerosol, angles):
         aerosol.taumol,
         aerosol.tauaer,
     )
-    inputdims = tuple([d.dims for d in args])
-    outputdims = [aerosol.p.dims, aerosol.tau.dims, aerosol.p.dims]
+    # inputdims = tuple([d.dims for d in args])
+    # outputdims = [aerosol.p.dims, aerosol.tau.dims, aerosol.p.dims]
     # t1t2, albatm, r = xr.apply_ufunc(prepare_coef_numpy, *args, input_core_dims=inputdims, output_core_dims=outputdims)
     t1t2, albatm, r = prepare_coef_numpy(
         aerosol.tau,
@@ -367,7 +328,7 @@ def prepare_coef_numpy(tau, g, p, cos_sza, cos_vza, inv_cos_za, gaer, taumol, ta
         + (3.0 * (1.0 + g) * (cos_sza * cos_vza) - 2.0 * sumcos) * astra
     )
 
-    r = p * astra + rms  # called ratm in new fortran code
+    ratm = p * astra + rms  # called ratm in new fortran code
 
     # atmospheric transmittance (updated 2022)
     tz = 1.0 + gaer ** 2 + (1.0 - gaer ** 2) * np.sqrt(1.0 + gaer ** 2)
@@ -391,22 +352,82 @@ def prepare_coef_numpy(tau, g, p, cos_sza, cos_vza, inv_cos_za, gaer, taumol, ta
     W1 = 1 + (1.0 + 0.5 * tau) * Z / 2 - y
     W2 = 1 + 0.75 * tau * (1.0 - g)
     albatm = 1 - W1 / W2
-    return t1t2, albatm, r
+    return t1t2, albatm, ratm
 
 
-def alb2rtoa(a, t1t2, r0, u1, u2, albatm, r):
-    # Function that calculates the theoretical reflectance from a snow spherical albedo a
-    # This function can then be solved to find optimal snow albedo
-    # Inputs:
-    # a                     Surface albedo
-    # r0                    reflectance of a semi-infinite non-absorbing snow layer
-    #
-    # Outputs:
-    # rs                  surface reflectance at specific channel
-    surf = t1t2 * r0 * a ** (u1 * u2 / r0) / (1 - a * albatm)
+def snow_albedo_solved(OLCI_scene, angles, aerosol, atmosphere, snow):
+    # solving iteratively the transcendental equation
+    # Update 2022: for all pixels!
+    snow["alb_sph"] = OLCI_scene.toa * np.nan
+    ind_solved = snow.r0.notnull()
+    iind_solved = dict(xy=np.arange(len(ind_solved))[ind_solved])
+    snow.alb_sph[iind_solved] = 1
+
+    def solver_wrapper(toa, tau, t1t2, r0, u1, u2, albatm, r):
+        # it is assumed that albedo is in the range 0.1-1.0
+        return zbrent(
+            0.1,
+            1,
+            args=(t1t2, r0, u1, u2, albatm, r, toa),
+            max_iter=100,
+            tolerance=1e-10,
+        )
+
+    solver_wrapper_v = np.vectorize(solver_wrapper)
+
+    # loop over all bands
+    for i_channel in range(21):
+        snow.alb_sph.sel(band=i_channel)[iind_solved] = solver_wrapper_v(
+            OLCI_scene.toa.sel(band=i_channel)[iind_solved],
+            aerosol.tau.sel(band=i_channel)[iind_solved],
+            atmosphere.t1t2.sel(band=i_channel)[iind_solved],
+            snow.r0[iind_solved],
+            angles.u1[iind_solved],
+            angles.u2[iind_solved],
+            atmosphere.albatm.sel(band=i_channel)[iind_solved],
+            atmosphere.r.sel(band=i_channel)[iind_solved],
+        )
+        # ind_bad = snow.alb_sph.sel(band=i_channel) == -999
+        # snow["isnow"] = xr.where(ind_bad, -i_channel, snow.isnow)
+
+        ind_bad = snow.alb_sph.sel(band=i_channel) < 0
+        snow.alb_sph.loc[dict(band=i_channel)] = xr.where(ind_bad, 
+                                                    1, 
+                                                    snow.alb_sph.sel(band=i_channel))
+    # some filtering
+    snow["alb_sph"] = snow.alb_sph.where(snow.isnow >= 0)
+    # ind_neg_alb = (
+    #     (snow.alb_sph.sel(band=0) < 0)
+    #     | (snow.alb_sph.sel(band=1) < 0)
+    #     | (snow.alb_sph.sel(band=2) < 0)
+    # )
+    # snow["alb_sph"] = xr.where(ind_neg_alb, np.nan, snow["alb_sph"])
+    # snow["isnow"] = xr.where(ind_neg_alb, 105, snow.isnow)
+
+    # correcting the retrived spherical albedo for fractional snow cover
+    snow["rp"] = snow.factor*(snow.alb_sph ** angles.u1)
+    snow["refl"] = (
+        snow.factor * snow.r0 * snow.alb_sph ** (angles.u1 * angles.u2 / snow.r0)
+    )
+    snow["alb_sph"] = snow["factor"] * snow["alb_sph"]
+    
+    ind_no_nan = snow["isnow"]!=999
+    snow["isnow"] = xr.where(snow.alb_sph.sel(band=0) > 0.98, 1, snow.isnow)
+    snow["isnow"] = xr.where(
+        (snow.alb_sph.sel(band=0) <= 0.98) & (snow.factor > 0.99), 2, snow.isnow
+    )
+    snow["isnow"] = xr.where(
+        (snow.alb_sph.sel(band=0) <= 0.98) & (snow.factor <= 0.99), 3, snow.isnow
+    )
+    snow["isnow"] = snow["isnow"].where(ind_no_nan)
+    return OLCI_scene, snow
+
+
+@numba.jit(nopython=True, cache=True)
+def f(albedo, t1t2, r0, u1, u2, albatm, r, toa):
+    surf = t1t2 * r0 * albedo ** (u1 * u2 / r0) / (1 - albedo * albatm)
     rs = r + surf
-    return rs
-
+    return toa - rs
 
 def snow_impurities(alb_sph, al):
     # analysis of snow impurities
@@ -438,6 +459,7 @@ def snow_impurities(alb_sph, al):
     # special case of soot impurities:
     msk_soot = (bm > 0) & (bm < 1.2)
     aload_ppm = xr.where(msk_soot, polut / 2.06e3, aload_ppm)
+    
     # if (factor < 0.99):
     #     nclass=3
 
@@ -490,156 +512,6 @@ def snow_albedo_direct(OLCI_scene, angles, aerosol, atmosphere, snow, impurities
     return OLCI_scene, snow
 
 
-def snow_albedo_solved(OLCI_scene, angles, aerosol, atmosphere, snow):
-    # solving iteratively the transcendental equation
-    # Update 2022: for all pixels!
-    snow["alb_sph"] = OLCI_scene.toa * np.nan
-    ind_solved = snow.r0.notnull()
-    iind_solved = dict(xy=np.arange(len(ind_solved))[ind_solved])
-    snow.alb_sph[iind_solved] = 1
-
-    def solver_wrapper(toa, tau, t1t2, r0, u1, u2, albatm, r):
-        # it is assumed that albedo is in the range 0.1-1.0
-        return zbrent(
-            0.1,
-            1,
-            args=(t1t2, r0, u1, u2, albatm, r, toa),
-            max_iter=30,
-            tolerance=2e-4,
-        )
-
-    solver_wrapper_v = np.vectorize(solver_wrapper)
-
-    # loop over all bands
-    for i_channel in range(21):
-        snow.alb_sph.sel(band=i_channel)[iind_solved] = solver_wrapper_v(
-            OLCI_scene.toa.sel(band=i_channel)[iind_solved],
-            aerosol.tau.sel(band=i_channel)[iind_solved],
-            atmosphere.t1t2.sel(band=i_channel)[iind_solved],
-            snow.r0[iind_solved],
-            angles.u1[iind_solved],
-            angles.u2[iind_solved],
-            atmosphere.albatm.sel(band=i_channel)[iind_solved],
-            atmosphere.r.sel(band=i_channel)[iind_solved],
-        )
-        # ind_bad = snow.alb_sph.sel(band=i_channel) == -999
-        # snow["isnow"] = xr.where(ind_bad, -i_channel, snow.isnow)
-        ind_bad = snow.alb_sph.sel(band=i_channel) < 0
-        snow.alb_sph.sel(band=i_channel).values = xr.where(ind_bad, 
-                                                    1, 
-                                                    snow.alb_sph.sel(band=i_channel))
-    # some filtering
-    snow["alb_sph"] = snow.alb_sph.where(snow.isnow >= 0)
-    ind_neg_alb = (
-        (snow.alb_sph.sel(band=0) < 0)
-        | (snow.alb_sph.sel(band=1) < 0)
-        | (snow.alb_sph.sel(band=2) < 0)
-    )
-    snow["alb_sph"] = xr.where(ind_neg_alb, np.nan, snow["alb_sph"])
-    # snow["isnow"] = xr.where(ind_neg_alb, 105, snow.isnow)
-
-    # correcting the retrived spherical albedo for fractional snow cover
-    # snow["alb_sph"] = snow["factor"] * snow["alb_sph"]
-    snow["rp"] = snow.alb_sph ** angles.u1
-    snow["refl"] = (
-        snow.factor * snow.r0 * snow.alb_sph ** (angles.u1 * angles.u2 / snow.r0)
-    )
-
-    ind_no_nan = snow["isnow"]!=999
-    snow["isnow"] = xr.where(snow.alb_sph.sel(band=0) > 0.98, 1, snow.isnow)
-    snow["isnow"] = xr.where(
-        (snow.alb_sph.sel(band=0) <= 0.98) & (snow.factor > 0.99), 2, snow.isnow
-    )
-    snow["isnow"] = xr.where(
-        (snow.alb_sph.sel(band=0) <= 0.98) & (snow.factor <= 0.99), 3, snow.isnow
-    )
-    snow["isnow"] = snow["isnow"].where(ind_no_nan)
-    return OLCI_scene, snow
-
-
-@numba.jit(nopython=True, cache=True)
-def f(albedo, t1t2, r0, u1, u2, albatm, r, toa):
-    surf = t1t2 * r0 * albedo ** (u1 * u2 / r0) / (1 - albedo * albatm)
-    rs = r + surf
-    return toa - rs
-
-
-@numba.jit(nopython=True, cache=True)
-def zbrent(x0, x1, args=(), max_iter=100, tolerance=1e-6):
-    # Equation solver using Brent's method
-    # https://en.wikipedia.org/wiki/Brent%27s_method
-    # Brent’s is essentially the Bisection method augmented with Inverse
-    # Quadratic Interpolation whenever such a step is safe. At it’s worst case
-    # it converges linearly and equal to Bisection, but in general it performs
-    # superlinearly; it combines the robustness of Bisection with the speedy
-    # convergence and inexpensive computation of Quasi-Newtonian methods.
-    # Because of this, you’re likely to find Brent’s as a default root-finding
-    # algorithm in popular libraries. For example, MATLAB’s fzero, used to find
-    # the root of a nonlinear function, employs a variation of Brent’s.
-    # Python script from https://nickcdryan.com/2017/09/13/root-finding-algorithms-in-python-line-search-bisection-secant-newton-raphson-boydens-inverse-quadratic-interpolation-brents/
-
-    fx0 = f(x0, *args)
-    fx1 = f(x1, *args)
-
-    #    print(str(fx0) + ", " + str(fx1))
-    if (fx0 * fx1) > 0:
-        #        print("Root not bracketed "+str(fx0)+", "+str(fx1))
-        #        assert ((fx0 * fx1) <= 0), ("-----Root not bracketed"+str(fx0)+", "+str(fx1))
-        return -999
-
-    if abs(fx0) < abs(fx1):
-        x0, x1 = x1, x0
-        fx0, fx1 = fx1, fx0
-
-    x2, fx2 = x0, fx0
-
-    d = x2  # any value is fine. It is not used at the first iteration
-
-    mflag = True
-    steps_taken = 0
-
-    while steps_taken < max_iter and abs(x1 - x0) > tolerance:
-        fx0 = f(x0, *args)
-        fx1 = f(x1, *args)
-        fx2 = f(x2, *args)
-
-        if fx0 != fx2 and fx1 != fx2:
-            L0 = (x0 * fx1 * fx2) / ((fx0 - fx1) * (fx0 - fx2))
-            L1 = (x1 * fx0 * fx2) / ((fx1 - fx0) * (fx1 - fx2))
-            L2 = (x2 * fx1 * fx0) / ((fx2 - fx0) * (fx2 - fx1))
-            new = L0 + L1 + L2
-
-        else:
-            new = x1 - ((fx1 * (x1 - x0)) / (fx1 - fx0))
-
-        if (
-            (new < ((3 * x0 + x1) / 4) or new > x1)
-            or (mflag == True and (abs(new - x1)) >= (abs(x1 - x2) / 2))
-            or (mflag == False and (abs(new - x1)) >= (abs(x2 - d) / 2))
-            or (mflag == True and (abs(x1 - x2)) < tolerance)
-            or (mflag == False and (abs(x2 - d)) < tolerance)
-        ):
-            new = (x0 + x1) / 2
-            mflag = True
-
-        else:
-            mflag = False
-
-        fnew = f(new, *args)
-        d, x2 = x2, x1
-
-        if (fx0 * fnew) < 0:
-            x1 = new
-        else:
-            x0 = new
-
-        if abs(fx0) < abs(fx1):
-            x0, x1 = x1, x0
-
-        steps_taken += 1
-
-    return x1
-
 
 def compute_BBA(OLCI_scene, snow, angles, compute_polluted=True):
     ind_all_clean = snow.isnow == 1
@@ -683,7 +555,7 @@ def compute_BBA(OLCI_scene, snow, angles, compute_polluted=True):
     # rviss = np.exp(-np.sqrt (7.86e-5*snow.al))
     # rnirs = 0.2335+0.56*np.exp(-np.sqrt(0.0327*snow.al))
 
-    msk = snow.isnow == 3
+    msk = OLCI_scene.toa.sel(band=0) < thv0
     snow["rp3"] = xr.where(msk, snow["rp3"] * snow.factor, snow["rp3"])
     # rvis = xr.where(msk, rvis*snow.factor, rvis)
     # rnir = xr.where(msk, rnir*snow.factor, rnir)
@@ -855,8 +727,10 @@ def BBA_calc_pol(alb, asol, sol1_pol, sol2, sol3_pol):
     r7 = alb[16, :]
     r8 = alb[20, :]
 
+
     # QUADRATIC POLYNOMIal for the range 400-709nm
     _, a1, b1, c1 = quad_func(alam2, alam3, alam5, r2, r3, r5)
+    coef1, coef2 = analyt_func(0.3, 0.7)
     ajx1 = a1 * sol1
     ajx2 = b1 * coef1
     ajx3 = c1 * coef2
@@ -865,6 +739,7 @@ def BBA_calc_pol(alb, asol, sol1_pol, sol2, sol3_pol):
 
     # QUADRATIC POLYNOMIal for the range 709-865nm
     _, a2, b2, c2 = quad_func(alam5, alam6, alam7, r5, r6, r7)
+    coef3, coef4 = analyt_func(0.7, 0.865)
     ajx1 = a2 * asol
     ajx2 = b2 * coef3
     ajx3 = c2 * coef4
@@ -889,6 +764,28 @@ def BBA_calc_pol(alb, asol, sol1_pol, sol2, sol3_pol):
 
     return BBA_vis, BBA_nir, BBA_sw
 
+def analyt_func(z1, z2):
+    # analystical integration of the solar flux
+    # see BBA_calc_pol
+    # compatible with array
+    ak1 = (z2 ** 2.0 - z1 ** 2.0) / 2.0
+    ak2 = (z2 / bet + 1.0 / bet ** 2) * np.exp(-bet * z2) - (
+        z1 / bet + 1.0 / bet ** 2
+    ) * np.exp(-bet * z1)
+    ak3 = (z2 / gam + 1.0 / gam ** 2) * np.exp(-gam * z2) - (
+        z1 / gam + 1.0 / gam ** 2
+    ) * np.exp(-gam * z1)
+
+    am1 = (z2 ** 3.0 - z1 ** 3.0) / 3.0
+    am2 = (z2 ** 2.0 / bet + 2.0 * z2 / bet ** 2 + 2.0 / bet ** 3) * np.exp(
+        -bet * z2
+    ) - (z1 ** 2.0 / bet + 2.0 * z1 / bet ** 2 + 2.0 / bet ** 3) * np.exp(-bet * z1)
+    am3 = (z2 ** 2.0 / gam + 2.0 * z2 / gam ** 2 + 2.0 / gam ** 3.0) * np.exp(
+        -gam * z2
+    ) - (z1 ** 2.0 / gam + 2.0 * z1 / gam ** 2 + 2.0 / gam ** 3.0) * np.exp(-gam * z1)
+
+    return (f0 * ak1 - f1 * ak2 - f2 * ak3), (f0 * am1 - f1 * am2 - f2 * am3)
+
 
 def quad_func(x0, x1, x2, y0, y1, y2):
     # quadratic function used for the polluted snow BBA calculation
@@ -904,13 +801,89 @@ def quad_func(x0, x1, x2, y0, y1, y2):
     sa = a1 + b1 * x1 + c1 * x1 * x1
     return sa, a1, b1, c1
 
+@numba.jit(nopython=True, cache=True)
+def zbrent(x0, x1, args=(), max_iter=100, tolerance=1e-12):
+    # Equation solver using Brent's method
+    # https://en.wikipedia.org/wiki/Brent%27s_method
+    # Brent’s is essentially the Bisection method augmented with Inverse
+    # Quadratic Interpolation whenever such a step is safe. At it’s worst case
+    # it converges linearly and equal to Bisection, but in general it performs
+    # superlinearly; it combines the robustness of Bisection with the speedy
+    # convergence and inexpensive computation of Quasi-Newtonian methods.
+    # Because of this, you’re likely to find Brent’s as a default root-finding
+    # algorithm in popular libraries. For example, MATLAB’s fzero, used to find
+    # the root of a nonlinear function, employs a variation of Brent’s.
+    # Python script from https://nickcdryan.com/2017/09/13/root-finding-algorithms-in-python-line-search-bisection-secant-newton-raphson-boydens-inverse-quadratic-interpolation-brents/
+
+    fx0 = f(x0, *args)
+    fx1 = f(x1, *args)
+
+    #    print(str(fx0) + ", " + str(fx1))
+    if (fx0 * fx1) > 0:
+        #        print("Root not bracketed "+str(fx0)+", "+str(fx1))
+        #        assert ((fx0 * fx1) <= 0), ("-----Root not bracketed"+str(fx0)+", "+str(fx1))
+        return -999
+
+    if abs(fx0) < abs(fx1):
+        x0, x1 = x1, x0
+        fx0, fx1 = fx1, fx0
+
+    x2, fx2 = x0, fx0
+
+    d = x2  # any value is fine. It is not used at the first iteration
+
+    mflag = True
+    steps_taken = 0
+
+    while steps_taken < max_iter and abs(x1 - x0) > tolerance:
+        fx0 = f(x0, *args)
+        fx1 = f(x1, *args)
+        fx2 = f(x2, *args)
+
+        if fx0 != fx2 and fx1 != fx2:
+            L0 = (x0 * fx1 * fx2) / ((fx0 - fx1) * (fx0 - fx2))
+            L1 = (x1 * fx0 * fx2) / ((fx1 - fx0) * (fx1 - fx2))
+            L2 = (x2 * fx1 * fx0) / ((fx2 - fx0) * (fx2 - fx1))
+            new = L0 + L1 + L2
+
+        else:
+            new = x1 - ((fx1 * (x1 - x0)) / (fx1 - fx0))
+
+        if (
+            (new < ((3 * x0 + x1) / 4) or new > x1)
+            or (mflag == True and (abs(new - x1)) >= (abs(x1 - x2) / 2))
+            or (mflag == False and (abs(new - x1)) >= (abs(x2 - d) / 2))
+            or (mflag == True and (abs(x1 - x2)) < tolerance)
+            or (mflag == False and (abs(x2 - d)) < tolerance)
+        ):
+            new = (x0 + x1) / 2
+            mflag = True
+
+        else:
+            mflag = False
+
+        fnew = f(new, *args)
+        d, x2 = x2, x1
+
+        if (fx0 * fnew) < 0:
+            x1 = new
+        else:
+            x0 = new
+
+        if abs(fx0) < abs(fx1):
+            x0, x1 = x1, x0
+
+        steps_taken += 1
+
+    return x1
+
+
 
 def process(OLCI_scene, compute_polluted=True, **kwargs):
     angles = view_geometry(OLCI_scene)
-    # OLCI_scene = ozone_correction(OLCI_scene)
     OLCI_scene, snow = prepare_processing(OLCI_scene, angles)
-    aerosol = aerosol_properties(OLCI_scene.elevation, angles.cos_sa, aot=0.07)
     OLCI_scene, angles, snow = snow_properties(OLCI_scene, angles, snow)
+    aerosol = aerosol_properties(OLCI_scene.elevation, angles.cos_sa, aot=0.07)
     atmosphere = prepare_coef(aerosol, angles)
 
     # first guess for the snow spherical albedo
@@ -924,6 +897,8 @@ def process(OLCI_scene, compute_polluted=True, **kwargs):
     )
 
     snow = compute_BBA(OLCI_scene, snow, angles, compute_polluted=compute_polluted)
+    # angles.u1.unstack(dim="xy").transpose("y", "x").rio.to_raster('./data/5_km_res/python/u1.tif')
+
     return snow
 
 
@@ -963,6 +938,8 @@ def process_by_chunk(OLCI_scene, chunk_size=150000, compute_polluted=True):
     snow["al"] = xr.concat(al, dim="xy")
     return snow
 
+
+
 if __name__ == "__main__":
     # if the script is called from the command line, then parsing the input path and
     # passing it to the main function
@@ -990,3 +967,4 @@ if __name__ == "__main__":
     write_output(snow, OutputFolder)
     snow.alb_sph.sel(band=0).unstack(dim="xy").transpose("y", "x").rio.to_raster(OutputFolder+'/alb_sph_01.tif')
     snow.alb_sph_direct.sel(band=0).unstack(dim="xy").transpose("y", "x").rio.to_raster(OutputFolder+'/alb_sph_direct_01.tif')
+

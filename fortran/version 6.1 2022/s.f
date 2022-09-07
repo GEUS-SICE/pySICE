@@ -1026,16 +1026,14 @@ c     SZA,VZA,RAA, reflectance at channel 1, reflectance at channel 2
      c sza,vza,raa,toa(1),toa(21),
 c                     retrieved TOC,ECMWF TOC, difference(%),cv1,cv2
      c       tocos,akozon,difka,cv1,cv2
-        if (j.gt.jend) go to 2403
         WRITE(1001,*) j,alat,alon,   
-     c      NCLASS,factor,(albs(ir),ir=1,21)
+     c      NCLASS,factor,(answ2(ir),ir=1,21)
         
         WRITE(1002,*) j,alat,alon,   
      c       NCLASS,factor,(albp(ir),ir=1,21)
           
         WRITE(1003,*) j,alat,alon,   
      c       NCLASS,factor,(botka(ir),ir=1,21)
- 2403   continue
 c**************************************************
 
 

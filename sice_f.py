@@ -76,7 +76,7 @@ olci_toa_save = olci_toa
 ind_good_pixels = np.logical_not(np.isnan(toa[0, :, :]).flatten())
 olci_toa = olci_toa[ind_good_pixels, :]
 olci_toa[np.isnan(olci_toa)] = 999
-OutputFolder = InputFolder + "fortran/"
+
 # os.mkdir(OutputFolder)
 print("\nInput file saved: " + OutputFolder + "input.dat")
 np.savetxt(
@@ -89,6 +89,8 @@ np.savetxt(
 #%%  You can now run sice.f
 shutil.copy(OutputFolder+'input.dat', ProcessingFolder[:-1])
 os.chdir('./fortran')
+print('Running sice.f')
+#subprocess.run('gfortran ./version\ 6.1\ 2022/s.f -o ./sice.exe', shell=True)
 subprocess.check_call('./sice.exe')
 for file in glob.glob(r'*.dat'):
     if file == 'thv.dat':
@@ -97,7 +99,7 @@ for file in glob.glob(r'*.dat'):
         continue
     
     print('Moving '+file)
-    shutil.move(file, '../'+OutputFolder)
+    shutil.move(file, '../'+OutputFolder+'/'+file)
 os.chdir('..')
 
 
@@ -125,6 +127,7 @@ output_sice_f(OutputFolder + "snow_parameters.dat", "snow_specific_area", 6)
 output_sice_f(OutputFolder + "snow_parameters.dat", "al", 7)
 output_sice_f(OutputFolder + "snow_parameters.dat", "r0", 8)
 output_sice_f(OutputFolder + "snow_parameters.dat", "albedo_bb_planar_sw", 16)
+output_sice_f(OutputFolder + "snow_parameters.dat", "u1", 17)
 output_sice_f(OutputFolder + "snow_parameters.dat", "albedo_bb_spherical_sw", 19)
 
 i = 0
@@ -159,21 +162,24 @@ output_sice_f(
 import xarray as xr
 import rioxarray
 import matplotlib.pyplot as plt
-%matplotlib qt
+#%matplotlib qt
 
 folder_f = 'data/5_km_res/fortran/'
 folder_p = 'data/5_km_res/python/'
 # var_list = ["grain_diameter", "snow_specific_area", "al",  
 #             "r0", "albedo_bb_planar_sw",  "albedo_bb_spherical_sw"]
-var_list = ["isnow", "alb_sph_01"]
+var_list = ["isnow", "alb_sph_01", 'al', "albedo_bb_spherical_sw"]
+plt.close('all')
 for var in var_list:
     ds_f = rioxarray.open_rasterio(folder_f+var+'.tif').squeeze()
     ds_p = rioxarray.open_rasterio(folder_p+var+'.tif').squeeze()
+    vmin = min(ds_f.min(), ds_p.min())
+    vmax = max(ds_f.max(), ds_p.max())
     fig, ax = plt.subplots(2,2, figsize=(15,15))
     ax=ax.flatten()
-    ds_f.dropna('x', 'all').dropna('y', 'all').plot(ax=ax[0])
+    ds_f.dropna('x', 'all').dropna('y', 'all').plot(ax=ax[0], vmin=vmin, vmax=vmax)
     ax[0].set_title('fortran')
-    ds_p.dropna('x', 'all').dropna('y', 'all').plot(ax=ax[1])
+    ds_p.dropna('x', 'all').dropna('y', 'all').plot(ax=ax[1], vmin=vmin, vmax=vmax)
     ax[1].set_title('python')
     
     (ds_p-ds_f).dropna('x', 'all').dropna('y', 'all').plot(ax=ax[2])
@@ -184,7 +190,6 @@ for var in var_list:
     ax[3].plot([ds_f.min(), ds_f.max()], [ds_f.min(), ds_f.max()],color='k')
     ax[3].set_xlabel('fortran')
     ax[3].set_ylabel('python')
-
-
     
+
     

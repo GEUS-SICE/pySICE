@@ -389,7 +389,7 @@ wls = xr.DataArray(
 )
 
 # Imaginary part of ice refrative index at OLCI channels
-bai = xr.DataArray(
+bai_old = xr.DataArray(
     [
         2.365e-11,
         2.7e-11,
@@ -415,13 +415,33 @@ bai = xr.DataArray(
     ],
     coords=[bandcoord],
 )
-# in fortran code:
-# c       imaginary part of ice refractive index at OLCI channels
-#     DATA kappa/6.27E-10,5.78E-10,6.49E-10,
-#  c 1.08E-9,1.46E-9,3.35E-09,
-#  c 8.58E-09,1.78E-08,1.95E-08,2.1E-08,3.3E-08,6.23E-08,7.1E-08,
-#  c 7.68E-08,8.13E-08,9.88E-08,2.4E-07,3.64E-07,4.2E-07,5.53e-07,
-#  c       2.25E-06/
+bai = xr.DataArray(
+    [
+        6.27E-10,
+        5.78E-10,
+        6.49E-10,
+        1.08E-9,
+        1.46E-9,
+        3.35E-09,
+        8.58E-09,
+        1.78E-08,
+        1.95E-08,
+        2.1E-08,
+        3.3E-08,
+        6.23E-08,
+        7.1E-08,
+        7.68E-08,
+        8.13E-08,
+        9.88E-08,
+        2.4E-07,
+        3.64E-07,
+        4.2E-07,
+        5.53e-07,
+        2.25E-06,
+    ],
+    coords=[bandcoord],
+)
+
 
 # BULK ice absorption coefficient at all OLCI channels  (1/nm)
 alpha = 4 * np.pi * bai / wls
@@ -490,32 +510,3 @@ sol3 = sol1 + sol2
 
 # asol specific band
 asol = sol(0.865) - sol(0.7)
-
-# analystical integration of the solar flux
-def analyt_func(z1, z2):
-    # see BBA_calc_pol
-    # compatible with array
-    ak1 = (z2 ** 2.0 - z1 ** 2.0) / 2.0
-    ak2 = (z2 / bet + 1.0 / bet ** 2) * np.exp(-bet * z2) - (
-        z1 / bet + 1.0 / bet ** 2
-    ) * np.exp(-bet * z1)
-    ak3 = (z2 / gam + 1.0 / gam ** 2) * np.exp(-gam * z2) - (
-        z1 / gam + 1.0 / gam ** 2
-    ) * np.exp(-gam * z1)
-
-    am1 = (z2 ** 3.0 - z1 ** 3.0) / 3.0
-    am2 = (z2 ** 2.0 / bet + 2.0 * z2 / bet ** 2 + 2.0 / bet ** 3) * np.exp(
-        -bet * z2
-    ) - (z1 ** 2.0 / bet + 2.0 * z1 / bet ** 2 + 2.0 / bet ** 3) * np.exp(-bet * z1)
-    am3 = (z2 ** 2.0 / gam + 2.0 * z2 / gam ** 2 + 2.0 / gam ** 3.0) * np.exp(
-        -gam * z2
-    ) - (z1 ** 2.0 / gam + 2.0 * z1 / gam ** 2 + 2.0 / gam ** 3.0) * np.exp(-gam * z1)
-
-    return (f0 * ak1 - f1 * ak2 - f2 * ak3), (f0 * am1 - f1 * am2 - f2 * am3)
-
-
-# %% solar constant
-# segment 1
-coef1, coef2 = analyt_func(0.3, 0.7)
-# segment 2
-coef3, coef4 = analyt_func(0.7, 0.865)
