@@ -745,6 +745,8 @@ c     QUADRATIC POLYNOMIAL for the range 709-865nm
                            a2=x1*x2*y0/d1+x0*x2*y1/d2+x0*x1*y2/d3
                            b2=-(x1+x2)*y0/d1-(x0+x2)*y1/d2-(x0+x1)*y2/d3
                            c2=y0/d1+y1/d2+y2/d3
+                           x=x1
+                           sa1=a2+b2*x+c2*x*x
 c     QUADRATIC POLYNOMIAL for the range 400-709nm
       x0=alam2; x1=alam3; x2=alam5
       y0=r2; y1=r3; y2=r5
@@ -754,6 +756,8 @@ c     QUADRATIC POLYNOMIAL for the range 400-709nm
                            a1=x1*x2*y0/d1+x0*x2*y1/d2+x0*x1*y2/d3
                            b1=-(x1+x2)*y0/d1-(x0+x2)*y1/d2-(x0+x1)*y2/d3
                            c1=y0/d1+y1/d2+y2/d3
+                           x=x1
+                           sa1=a1+b1*x+c1*x*x
 c     exponential approximation for the range above 0.865nm
                            x0=    alam7
                            x1=    alam8
@@ -761,6 +765,8 @@ c     exponential approximation for the range above 0.865nm
                            alasta=(x1-x0)/alog(rati)
                            an=1./alasta
                            p=r7*exp(x0/alasta)
+                           x=alam8
+                           sa1=p*exp(-x/alasta)
 c     END of approximations for 3 intervals
 
 c     approximation for the solar flux
@@ -771,12 +777,18 @@ c     f=f0+f1*exp(-bet*lambda/star1)+f2*exp(-gam*lambda)
 c     ANALYTICAL INTEGRATION OF SOLAR FLUX (DOMINATOR)
                              z1=0.3; z2=0.7
                              sol1a=f0*(z2-z1)
+                             adx1= exp(-bet*z2)
+                             adx2=exp(-bet*z1)
+                             addx=dx1-dx2
                            sol1b=-f1*(  exp(-bet*z2) -exp(-bet*z1)) /bet
                            sol1c=-f2*(  exp(-gam*z2)-exp(-gam*z1))/gam
                            sol1=sol1a+sol1b+sol1c
 
                               z1=0.7; z2=2.4
                                    sol1a=f0*(z2-z1)
+                             adx1= exp(-bet*z2)
+                             adx2=exp(-bet*z1)
+                             addx=dx1-dx2
                            sol1b=-f1*(  exp(-bet*z2) -exp(-bet*z1)) /bet
                            sol1c=-f2*(  exp(-gam*z2)-exp(-gam*z1))/gam
                      sol2=sol1a+sol1b+sol1c
