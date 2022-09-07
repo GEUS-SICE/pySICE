@@ -8,7 +8,7 @@ c                  RETRIEVAL OF SNOW PROPERTIES
 c                  USING OLCI     
 c                  a.a.kokhanovsky@gmail.com
 c                  August 20, 2022
-c                  Version 1.1(search: ALEX)
+c                  Version 6.2
 c***********************************************
      
       REAL TOA(21),KAPPA(21),CALIB(21),alkas(21),alpha(21)
@@ -1026,14 +1026,18 @@ c     SZA,VZA,RAA, reflectance at channel 1, reflectance at channel 2
      c sza,vza,raa,toa(1),toa(21),
 c                     retrieved TOC,ECMWF TOC, difference(%),cv1,cv2
      c       tocos,akozon,difka,cv1,cv2
+         if (j.gt.jend) go to 2404
+
         WRITE(1001,*) j,alat,alon,   
-     c      NCLASS,factor,(answ2(ir),ir=1,21)
+     c      NCLASS,factor,(albs(ir),ir=1,21)
         
         WRITE(1002,*) j,alat,alon,   
      c       NCLASS,factor,(albp(ir),ir=1,21)
           
         WRITE(1003,*) j,alat,alon,   
      c       NCLASS,factor,(botka(ir),ir=1,21)
+2404    continue
+
 c**************************************************
 
 
@@ -1179,7 +1183,7 @@ c                  HG phase function for aerosol
                        
 c******************************************************************                       
 c                                  SOBOLEV
-                          
+                       amf=1./am1+1./am2
                        ASTRA=(1.-exp(-tau*amf))/(am1+am2)/4.
                        OSKAR=4.+3.*(1.-g)*tau
                        

@@ -12,8 +12,8 @@ c***********************************************
       REAL TOK(21),F(21),cabsoz(21),panswer(21),botswer(21)
       REAL albs(21),albp(21),botka(21)
       COMMON sza,vza,raa, am1,am2,u1,u2,co,
-     c  alam,reflec,height,aot,anna,pi,rv,tauaer,
-     c  taumol,gaer,t620,MOLEC
+     c  alam,reflec,height,aot,anna,pi,r0,tauaer,
+     c  taumol,gaer,t620,MOLEC,refatm, tatm, albatm
       COMMON /CD/ WELT
       COMMON /ANS/ ANSW2,PAnswer
       COMMON/ANB/ albs,albp
@@ -121,6 +121,7 @@ c          calibration of OLCI channels(currently not used)
 
 c      snow fraction:
        factor=1.
+c      geometry of the system:
                   raa=180.-(vaa-saa)
                   am1=cos(sza*pi/180.)
                   am2=cos(vza*pi/180.)  
@@ -157,8 +158,7 @@ c     valid for clean and polluted PARTIALLY SNOW COVERED PIXELS
 c     atmospheric contribution is ignored at 865 amd 1020nm          
 c     nonabsorbing snow reflectance:        
           r0=ctoa(17)**eps*ctoa(21)**(1.-eps)
-
-          rv=r0
+		  
       akapf=2.25e-6
       AB1020=4.*pi*akapf/1.02
       r1020=ctoa(21)
@@ -204,14 +204,23 @@ c*************************************************************************
 c           wavelength(micron):             
             alam=alkas(nkl)/1000.
 c     OLCI CALBRATED TOA REFLECTANCE:            
-      reflec= ctoa(nkl)
+				reflec= ctoa(nkl)
 	  
-      tauaer=aot*(alam/0.5)**(-anna)
-      taumol=0.008735/alam**(4.08)
-      okota=height/6000.
-      if (okota.gt.0.) taumol=taumol*exp(-okota)
-      tau=tauaer+taumol
-	  
+				  tauaer=aot*(alam/0.5)**(-anna)
+				  taumol=0.008735/alam**(4.08)
+				  okota=height/6000.
+				  if (okota.gt.0.) taumol=taumol*exp(-okota)
+				  tau=tauaer+taumol
+c          asymmetry parameter
+                       g0=0.5263
+                       g1=0.4627
+                       wave0=0.4685                       
+                       gaer=g0+g1*exp(-alam/wave0)
+                       g=tauaer*gaer/tau
+                    refatm=func1(tau)
+                    tatm=  func2(tau)
+                    albatm=func3(tau)
+					
 c     retrieval of  snow spherical albedo at all OLCI channels     
 c     only retrievals at NKL=1 (400nm) and NKL =4 (490nm) are used to get
 c     snow impurity parameters         
@@ -380,6 +389,7 @@ c          asymmetry parameter
                     refatm=func1(tau)
                     tatm=  func2(tau)
                     albatm=func3(tau)
+					
                     rsnow=r0*answ2(7)**z
                     ckk=refatm+tatm*rsnow/(1.-answ2(7)*albatm)
                     tt620=ctoa(7)/ckk
@@ -389,19 +399,7 @@ c          asymmetry parameter
                 alam=alkas(jt)/1000.
                 welt=factor
                 TOAR=fox(answ2(jt))
-                 tauaer=aot*(alam/0.5)**(-anna)
-                   taumol=0.008735/alam**(4.08)
-                   okota=height/6000.
-                   if (okota.gt.0.) taumol=taumol*exp(-okota)
-                     tau=tauaer+taumol
-c          asymmetry parameter
-                       g0=0.5263
-                       g1=0.4627
-                       wave0=0.4685                       
-                       gaer=g0+g1*exp(-alam/wave0)
-                       g=tauaer*gaer/tau
-                    albatm=func3(tau)
-
+				
          Tozone=t620**f(jt)
          TOX=1.
          TVODA=1.
@@ -476,32 +474,31 @@ c     snow index     (0-no snow, 1- snow)
 c     SZA,VZA,RAA, reflectance at channel 1, reflectance at channel 2   
 c     retrieved TOC,ECMWF TOC, difference(%),cv1,cv2
 
-        WRITE(1004,*) j,alat,alon, NCLASS,factor,diam,ssa,dlina,rv,
+        WRITE(1004,*) j,alat,alon, NCLASS,factor,diam,ssa,dlina,r0,
      c aload1,powe,polut,deff,absor1,absef660,absor1000, rsw,
      c rvis,rnir, rsws, rviss,rnirs, andbi,andsi,ratka,
      c NPOLE, NBARE, NSNOW, sza,vza,raa,toa(1),toa(21),
      c tocos,akozon,difka,cv1,cv2
 	 
-        WRITE(1001,*) j,alat,alon,NCLASS,factor,(answ2(ir),ir=1,21)
+        WRITE(1001,*) j,alat,alon,NCLASS,factor,(albs(ir),ir=1,21)
         WRITE(1002,*) j,alat,alon,NCLASS,factor,(albp(ir),ir=1,21)
         WRITE(1003,*) j,alat,alon,NCLASS,factor,(botka(ir),ir=1,21)
- 
-        if (abs(cv2).gt.THV1.or.diam.lt.THV2.or.DIFKA.gt.THV3) go to 932
-		
 c     *****    output: postprocessing *****
-      WRITE(7004,*) j,alat,alon,   
-     c NCLASS,factor,diam,ssa,dlina,rv,aload1,powe,polut,
+c     only if it passes the quality test
+
+       if (ccv2.gt.THV1.or.diam.lt.THV2.or.DIFKA.gt.THV3) go to 932
+        WRITE(7004,*) j,alat,alon,   
+     c NCLASS,factor,diam,ssa,dlina,r0,aload1,powe,polut,
      c deff,absor1,absef660,absor1000,
      c rsw,rvis,rnir,rsws,rviss,rnirs,ansi,andbi,
      c ratka,npole,nbare,nsnow,sza,vza,raa,toa(1),toa(21),
      c tocos,akozon,difka,cv1,cv2 
 	 
-         if (j.gt.jend) go to 2404
         WRITE(7001,*) j,alat,alon, NCLASS,factor,(albs(ir),ir=1,21)  
         WRITE(7002,*) j,alat,alon, NCLASS,factor,(albp(ir),ir=1,21)     
         WRITE(7003,*) j,alat,alon, NCLASS,factor,(botka(ir),ir=1,21)
-2404    continue
-932       continue
+		
+932        continue
 87        continue
       STOP
       END
@@ -510,24 +507,9 @@ c**********************************************
 c               MINIMIZATION FUNCTION:      
       FUNCTION  fun(x)
        common sza,vza,raa, am1,am2,u1,u2,co,alam,
-     c reflec,height,aot,anna,pi,rv,tauaer,
-     c taumol,gaer,t620,MOLEC
-                        r0=rv            
-           tauaer=aot*(alam/0.5)**(-anna)
-             taumol=0.008735/alam**(4.08)
-                   okota=height/6000.
-                   if (okota.gt.0.) taumol=taumol*exp(-okota)
-
-          tau=tauaer+taumol
-c          asymmetry parameter
-                       g0=0.5263
-                       g1=0.4627
-                       wave0=0.4685                       
-                       gaer=g0+g1*exp(-alam/wave0)
-                       g=tauaer*gaer/tau
-                    refatm=func1(tau)
-                    tatm=  func2(tau)
-                    albatm=func3(tau)
+     c reflec,height,aot,anna,pi,r0,tauaer,
+     c taumol,gaer,t620,MOLEC,refatm, tatm, albatm
+                                    
                     z=u1*u2/r0
                     RFINAL=refatm + tatm*r0*x**z/(1.-albatm*x)
                     fun=reflec-RFINAL
@@ -535,13 +517,11 @@ c          asymmetry parameter
                                              return  
                                              end
 
-c******************************************************************
+c******************** atmospheric refletance *****************
              function func1(tau)
         common sza,vza,raa, am1,am2,u1,u2,co,
      c  alam,reflec,height,aot,anna,pi,r0,tauaer,
      c  taumol,gaer,t620
-	 
-               wav=alam
 c                  HG phase function for aerosol
                        g11= 0.80; g22=-0.45
                        pa1=(1-g11*g11)/(1.-2.*g11*co+g11*g11)**1.5
@@ -552,7 +532,7 @@ c                  HG phase function for aerosol
                         p=(taumol*pr+tauaer*pa)/tau
                         g=tauaer*gaer/tau
 
-c                                  SOBOLEV
+                  amf=1./am1+1./am2
                        ASTRA=(1.-exp(-tau*amf))/(am1+am2)/4.
                        OSKAR=4.+3.*(1.-g)*tau
                        b1=1.+1.5*am1+(1.-1.5*am1)*exp(-tau/am1)
@@ -564,12 +544,12 @@ c                                  SOBOLEV
                                               return  
                                               end
 
-c******************************************************************
+c******************* atmospheric transmittance ********************
       function func2(tau)
        common sza,vza,raa, am1,am2,u1,u2,co,
-     c alam,reflec,height,aot,anna,pi,rv,tauaer,
+     c alam,reflec,height,aot,anna,pi,r0,tauaer,
      c taumol,gaer,t620,MOLEC
-       r0=rv
+       
                TZ=1.+gaer*gaer+(1.-gaer*gaer)*sqrt(1.+gaer*gaer)              
                Baer=0.5 +gaer*(gaer*gaer-3.)/TZ/2.             
                if (gaer.lt.1.e-3) go to 89 
@@ -586,9 +566,9 @@ c******************************************************************
 c******************************************************************
        function func3(tau)
        common sza,vza,raa, am1,am2,u1,u2,co,
-     c alam,reflec,height,aot,anna,pi,rv,tauaer,
+     c alam,reflec,height,aot,anna,pi,r0,tauaer,
      c taumol,gaer ,t620, MOLEC
-       r0=rv
+       
          gasa=0.5772157
          g=tauaer*gaer/tau         
          y=(1.+tau)*tau*exp(-tau)/4.
@@ -671,10 +651,10 @@ c******************************************************************
 c******************************************************************
            FUNCTION  fox(x)
        common sza,vza,raa, am1,am2,u1,u2,co,
-     c alam,reflec,height,aot,anna,pi,rv,tauaer,
+     c alam,reflec,height,aot,anna,pi,r0,tauaer,
      c taumol,gaer,t620,MOLEC
           common /CD/ WELT                         
-                  r0=rv
+                  
                     tauaer=aot*(alam/0.5)**(-anna)
                       taumol=0.008735/alam**(4.08)
                    okota=height/6000.

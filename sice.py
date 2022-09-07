@@ -244,7 +244,7 @@ def aerosol_properties(height, cos_sa, aot=0.07):
     # MOLEC = 1 version:
     taumol = 0.008735 * wls ** (-4.08)
     taumol = xr.where((height/6000)>0,
-                      taumol*np.exp(height / 6000),
+                      taumol*np.exp(-height / 6000),
                       taumol)
     # MOLEC = 0 version:
     # taumol=0.0053/wls**(4.0932)
@@ -727,7 +727,6 @@ def BBA_calc_pol(alb, asol, sol1_pol, sol2, sol3_pol):
     r7 = alb[16, :]
     r8 = alb[20, :]
 
-
     # QUADRATIC POLYNOMIal for the range 400-709nm
     _, a1, b1, c1 = quad_func(alam2, alam3, alam5, r2, r3, r5)
     coef1, coef2 = analyt_func(0.3, 0.7)
@@ -800,6 +799,7 @@ def quad_func(x0, x1, x2, y0, y1, y2):
     c1 = y0 / d1 + y1 / d2 + y2 / d3
     sa = a1 + b1 * x1 + c1 * x1 * x1
     return sa, a1, b1, c1
+
 
 @numba.jit(nopython=True, cache=True)
 def zbrent(x0, x1, args=(), max_iter=100, tolerance=1e-12):
@@ -878,7 +878,6 @@ def zbrent(x0, x1, args=(), max_iter=100, tolerance=1e-12):
     return x1
 
 
-
 def process(OLCI_scene, compute_polluted=True, **kwargs):
     angles = view_geometry(OLCI_scene)
     OLCI_scene, snow = prepare_processing(OLCI_scene, angles)
@@ -897,7 +896,9 @@ def process(OLCI_scene, compute_polluted=True, **kwargs):
     )
 
     snow = compute_BBA(OLCI_scene, snow, angles, compute_polluted=compute_polluted)
-    # angles.u1.unstack(dim="xy").transpose("y", "x").rio.to_raster('./data/5_km_res/python/u1.tif')
+    atmosphere.r.sel(band=0).unstack(dim="xy").transpose("y", "x").rio.to_raster('./data/5_km_res/python/refatm_v_01.tif')
+    atmosphere.t1t2.sel(band=0).unstack(dim="xy").transpose("y", "x").rio.to_raster('./data/5_km_res/python/tatm_v_01.tif')
+    atmosphere.albatm.sel(band=0).unstack(dim="xy").transpose("y", "x").rio.to_raster('./data/5_km_res/python/albatm_v_01.tif')
 
     return snow
 

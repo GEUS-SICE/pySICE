@@ -136,6 +136,21 @@ output_sice_f(
     "alb_sph_" + str(i + 1).zfill(2),
     5 + i,
 )
+output_sice_f(
+    OutputFolder + "refatm_v.dat",
+    "refatm_v_" + str(i + 1).zfill(2),
+    5 + i,
+)
+output_sice_f(
+    OutputFolder + "tatm_v.dat",
+    "tatm_v_" + str(i + 1).zfill(2),
+    5 + i,
+)
+output_sice_f(
+    OutputFolder + "albatm_v.dat",
+    "albatm_v_" + str(i + 1).zfill(2),
+    5 + i,
+)
 #    for i in range(21):
 #        output_sice_f(
 #            OutputFolder + "spherical_albedo.dat",
@@ -168,7 +183,7 @@ folder_f = 'data/5_km_res/fortran/'
 folder_p = 'data/5_km_res/python/'
 # var_list = ["grain_diameter", "snow_specific_area", "al",  
 #             "r0", "albedo_bb_planar_sw",  "albedo_bb_spherical_sw"]
-var_list = ["isnow", "alb_sph_01", 'al', "albedo_bb_spherical_sw"]
+var_list = ["isnow", "alb_sph_01", 'refatm_v_01', 'tatm_v_01', 'albatm_v_01', "albedo_bb_spherical_sw"]
 plt.close('all')
 for var in var_list:
     ds_f = rioxarray.open_rasterio(folder_f+var+'.tif').squeeze()
