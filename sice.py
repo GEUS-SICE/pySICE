@@ -435,30 +435,29 @@ def snow_impurities(alb_sph, al):
     # polut    normalized absorption coefficient of pollutants ay 1000nm ( in inverse mm)
     # bm    Angstroem absorption coefficient of pollutants ( around 1 - for soot, 3-7 for dust
 
-    # initializing new outputs:
-    aload_ppm = wls.sel(band=0) * 0
-    deff = wls.sel(band=0) * 0
-    absor1 = wls.sel(band=0) * 0
-    absef660 = wls.sel(band=0) * 0
-    absor1000 = wls.sel(band=0) * 0
-
     ind_nonan = ~np.isnan(alb_sph.sel(band=0)) & ~np.isnan(alb_sph.sel(band=3))
+    
     p1 = np.log(alb_sph.sel(band=0)) ** 2
     p2 = np.log(alb_sph.sel(band=3)) ** 2
-    msk = (alb_sph.sel(band=0) < 0.999) & (alb_sph.sel(band=3) < 0.999)
-
+    msk = (alb_sph.sel(band=0) <= 0.999) & (alb_sph.sel(band=3) <= 0.999)
+    zara = xr.where(msk, p1/p2, 1)
+    
     # 1-retrieved absorption Angström exponent (AAE):
-    bm = np.log(xr.where(msk, p1 / p2, 1)) / np.log(wls.sel(band=3) / wls.sel(band=0))
-    bm = xr.where(bm > 0.9, bm, 0)
-    # type of pollutants
-    ntype = 2 + (bm > 1.2)  # 1=soot, 2 = dust, 0 = no impurity retrieved
-    ntype = xr.where(bm > 0.9, ntype, 0)
+    bm = np.log(zara) / np.log(wls.sel(band=3) / wls.sel(band=0))
+    bm = xr.where(bm <= 0.9, 0, bm)
+    
     # 2-retrieved pollution load coefficient (PLC), 1/mm:
-    polut = xr.where(bm > 0.9, wls.sel(band=0) ** bm * p1 / al, 0)
+    polut = xr.where(bm > 0.9, 
+                     wls.sel(band=0) ** bm * p1 / al,
+                     0)
+    
+    # type of pollutants
+    ntype = 2 - (bm >= 1.2)  # 1=dust, 2 = soot, 0 = no impurity retrieved
+    ntype = xr.where(bm > 0.9, ntype, 0)
 
     # special case of soot impurities:
     msk_soot = (bm > 0) & (bm < 1.2)
-    aload_ppm = xr.where(msk_soot, polut / 2.06e3, aload_ppm)
+    aload_ppm = xr.where(msk_soot, polut / 2.06e3, 0)
     
     # if (factor < 0.99):
     #     nclass=3
@@ -470,18 +469,18 @@ def snow_impurities(alb_sph, al):
     # at the wavelength 1 micron      (1/mm)
     absor1 = 10.916 - 2.0831 * bm + 0.5441 * bm * bm
     # mass absorption coefficient (MAC) of dust in snow ( cm**3/g/mm)
-    dens2 = 2.65  # density of dust
     densi = 2.65 / 0.917
     aload = 1.8 * densi * polut / absor1
     # 5- retrieved impurity load (ppmw- ppm weight):
     aload_ppm = 1.0e6 * aload
     # 6- retrieved mass absorption coefficient (MAC) of dust in snow at 1000nm(m**2/g)
+    dens2 = 2.65  # density of dust
     absor1000 = absor1 / dens2 * 1.0e-3
     # 7-retrieved mass absorption coefficient (MAC) of dust in snow at 660nm(m**2/g)
     absef660 = absor1000 * (0.660) ** (-bm)
 
-    # no retrieval for too load impurity load (below 2ppm):
-    msk_low_imp = aload_ppm <= 2
+    # no retrieval for too low impurity load (below 2ppm):
+    msk_low_imp = (aload_ppm <= 2) & (bm >= 1.2)
     deff = xr.where(msk_low_imp, 0, deff)
     absor1 = xr.where(msk_low_imp, 0, absor1)
     absef660 = xr.where(msk_low_imp, 0, absef660)
@@ -489,6 +488,12 @@ def snow_impurities(alb_sph, al):
     bm = xr.where(msk_low_imp, 0, bm)
     polut = xr.where(msk_low_imp, 0, polut)
     aload_ppm = xr.where(msk_low_imp, 0, aload_ppm)
+
+    aload_ppm = xr.where(bm < 0.9, 0, aload_ppm)
+    bm = xr.where(bm > 10, 0, bm)
+    aload_ppm = xr.where(bm > 10, 0, aload_ppm)
+    bm = xr.where(bm < 0.9, 0, bm)
+
 
     impurities = xr.Dataset()
     impurities["ntype"] = ntype.where(ind_nonan)
@@ -502,9 +507,9 @@ def snow_albedo_direct(OLCI_scene, angles, aerosol, atmosphere, snow, impurities
     # direct caluclation including impurities
     # not sure where it is used
 
-    alpha = 1000.0 * 4.0 * np.pi * (bai / wls * snow.al)
+    alpha = 1000.0 * 4.0 * np.pi * (bai / wls)
     sdu = impurities.polut * wls ** (-impurities.bm)
-    snow["alb_sph_direct"] = np.minimum(snow.factor * np.exp(-np.sqrt(alpha + sdu)), 1)
+    snow["alb_sph_direct"] = snow.factor * np.exp(-np.sqrt((alpha + sdu)*snow.al))
     snow["rp_direct"] = snow.alb_sph_direct ** angles.u1
     snow["refl_direct"] = (
         snow.factor * snow.r0 * snow.alb_sph_direct ** (angles.u1 * angles.u2 / snow.r0)
@@ -896,10 +901,10 @@ def process(OLCI_scene, compute_polluted=True, **kwargs):
     )
 
     snow = compute_BBA(OLCI_scene, snow, angles, compute_polluted=compute_polluted)
-    atmosphere.r.sel(band=0).unstack(dim="xy").transpose("y", "x").rio.to_raster('./data/5_km_res/python/refatm_v_01.tif')
-    atmosphere.t1t2.sel(band=0).unstack(dim="xy").transpose("y", "x").rio.to_raster('./data/5_km_res/python/tatm_v_01.tif')
-    atmosphere.albatm.sel(band=0).unstack(dim="xy").transpose("y", "x").rio.to_raster('./data/5_km_res/python/albatm_v_01.tif')
 
+    
+    (impurities.polut*1000).unstack(dim="xy").transpose("y", "x").rio.to_raster('./data/5_km_res/python/polut.tif')
+    impurities.bm.unstack(dim="xy").transpose("y", "x").rio.to_raster('./data/5_km_res/python/bm.tif')
     return snow
 
 
@@ -966,6 +971,6 @@ if __name__ == "__main__":
     print("Time elapsed: ", duration)
 
     write_output(snow, OutputFolder)
-    snow.alb_sph.sel(band=0).unstack(dim="xy").transpose("y", "x").rio.to_raster(OutputFolder+'/alb_sph_01.tif')
-    snow.alb_sph_direct.sel(band=0).unstack(dim="xy").transpose("y", "x").rio.to_raster(OutputFolder+'/alb_sph_direct_01.tif')
+    # snow.alb_sph.sel(band=0).unstack(dim="xy").transpose("y", "x").rio.to_raster(OutputFolder+'/alb_sph_01.tif')
+    snow.alb_sph_direct.sel(band=0).unstack(dim="xy").transpose("y", "x").rio.to_raster(OutputFolder+'/alb_sph_01.tif')
 

@@ -253,8 +253,8 @@ c            STEP_3_2                     *
 c     retrieval of properties of          *
 c     snow impurities + load of impurities*                    
 c******************************************
-      aload1=0; powe=0; polut=0; absor1=0; absef660=0
-      absor1000=0; deff=0.0; absef660=0.0; absor1000=0.0
+      aload1=0.; powe=0.; polut=0.; absor1=0.; absef660=0.
+      absor1000=0.; deff=0.0; absef660=0.0; absor1000=0.0
       r1=answer(1)
       r2=answer(4)
       zara=1.

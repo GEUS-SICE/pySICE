@@ -8,7 +8,7 @@ c                  RETRIEVAL OF SNOW PROPERTIES
 c                  USING OLCI     
 c                  a.a.kokhanovsky@gmail.com
 c                  August 20, 2022
-c                  Version 1.1(search: ALEX)
+c                  Version 6.2 (search: bav)
 c***********************************************
      
       REAL TOA(21),KAPPA(21),CALIB(21),alkas(21),alpha(21)
@@ -811,7 +811,8 @@ c          asymmetry parameter
                        g0=0.5263
                        g1=0.4627
                        wave0=0.4685                       
-                       gaer=g0+g1*exp(-alam/wave0)
+c update bav 2022				   
+                       gaer=g0+g1*exp(-0.62/wave0)
                        g=tauaer*gaer/tau
                     
 
@@ -1181,7 +1182,8 @@ c                  HG phase function for aerosol
                        
 c******************************************************************                       
 c                                  SOBOLEV
-                          
+c update bav 2022
+                       amf=1./am1+1./am2
                        ASTRA=(1.-exp(-tau*amf))/(am1+am2)/4.
                        OSKAR=4.+3.*(1.-g)*tau
                        
