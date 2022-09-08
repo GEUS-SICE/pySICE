@@ -20,8 +20,8 @@ import rioxarray
 import shutil
 import glob
 import subprocess
-InputFolder = './data/5_km_res/'
-OutputFolder = './data/5_km_res/fortran/'
+InputFolder = './data/2019-06-14/'
+OutputFolder = './data/2019-06-14/fortran/'
 ProcessingFolder = './fortran/'
 # %% 
 start_time = time.time()
@@ -137,6 +137,34 @@ output_sice_f(
     "alb_sph_" + str(i + 1).zfill(2),
     5 + i,
 )
+output_sice_f(
+    OutputFolder + "spectral_spherical_albedo_solved.dat",
+    "alb_sph_" + str(i + 1).zfill(2) + '_solved',
+    5 + i,
+)
+output_sice_f(
+    OutputFolder + "spectral_plane_albedo.dat",
+    "alb_pl_" + str(i + 1).zfill(2),
+    5 + i,
+)
+
+output_sice_f(
+    OutputFolder + "spectral_plane_albedo_solved.dat",
+    "alb_pl_" + str(i + 1).zfill(2)+ '_solved',
+    5 + i,
+)
+output_sice_f(
+    OutputFolder + "spectral_bOAR.dat",
+    "BOAR_" + str(i + 1).zfill(2),
+    5 + i,
+)
+
+output_sice_f(
+    OutputFolder + "spectral_BOAR_solved.dat",
+    "bOAR_" + str(i + 1).zfill(2)+ '_solved',
+    5 + i,
+)
+
 
 #    for i in range(21):
 #        output_sice_f(
@@ -165,30 +193,40 @@ import xarray as xr
 import rioxarray
 import matplotlib.pyplot as plt
 #%matplotlib qt
+import numpy as np
 
-folder_f = 'data/5_km_res/fortran/'
-folder_p = 'data/5_km_res/python/'
-# var_list = ["grain_diameter", "snow_specific_area", "al",  
-#             "r0", "albedo_bb_planar_sw",  "albedo_bb_spherical_sw"]
-var_list = ["isnow", "alb_sph_01", "albedo_bb_spherical_sw",'grain_diameter', "albedo_bb_planar_sw"]
+folder_f = 'data/2019-06-14/pySICEv1.5/'
+folder_p = 'data/2019-06-14/python/'
+var_list = ["grain_diameter", "snow_specific_area",   
+            "r0", "albedo_bb_planar_sw",  "albedo_bb_spherical_sw"]
+# var_list = ["isnow", "alb_sph_01", "alb_sph_01_solved", "alb_pl_01", "alb_pl_01_solved", "BOAR_01", "BOAR_01_solved"]
 plt.close('all')
 for var in var_list:
     ds_f = rioxarray.open_rasterio(folder_f+var+'.tif').squeeze()
-    ds_p = rioxarray.open_rasterio(folder_p+var+'.tif').squeeze()
+    ds_p = rioxarray.open_rasterio(folder_p+var+'.tif').squeeze().interp_like(ds_f)
+    
+    if var == 'polut':
+        ds_f = np.log10(ds_f)
+        ds_p = np.log10(ds_p)
+
+        
     vmin = min(ds_f.min(), ds_p.min())
     vmax = max(ds_f.max(), ds_p.max())
     fig, ax = plt.subplots(2,2, figsize=(15,15))
     ax=ax.flatten()
+
+        
     ds_f.dropna('x', 'all').dropna('y', 'all').plot(ax=ax[0], vmin=vmin, vmax=vmax)
-    ax[0].set_title('fortran')
+    ax[0].set_title('pySICEv1.6')
     ds_p.dropna('x', 'all').dropna('y', 'all').plot(ax=ax[1], vmin=vmin, vmax=vmax)
-    ax[1].set_title('python')
+    ax[1].set_title('pySICEv2.1')
     
     (ds_p-ds_f).dropna('x', 'all').dropna('y', 'all').plot(ax=ax[2])
     ax[2].set_title('python - fortran')
 
-
-    ax[3].plot(ds_f.values.flatten(), ds_p.values.flatten(), marker ='.', linestyle='None')
+    ax[3].plot(ds_f.where((ds_p-ds_f).notnull()).values.flatten(),
+               ds_p.where((ds_p-ds_f).notnull()).values.flatten(),
+               marker ='.', linestyle='None')
     ax[3].plot([ds_f.min(), ds_f.max()], [ds_f.min(), ds_f.max()],color='k')
     ax[3].set_xlabel('fortran')
     ax[3].set_ylabel('python')

@@ -343,6 +343,9 @@ def write_output(snow, OutputFolder):
         snow[var].unstack(dim="xy").transpose("y", "x").rio.to_raster(
             os.path.join(OutputFolder, file_name_list[var] + ".tif")
         )
-
+    snow.alb_sph.sel(band=0).unstack(dim="xy").transpose("y", "x").rio.to_raster(OutputFolder+'/alb_sph_01_solved.tif')
+    snow.alb_sph_direct.sel(band=0).unstack(dim="xy").transpose("y", "x").rio.to_raster(OutputFolder+'/alb_sph_01.tif')
+    snow.rp.sel(band=0).unstack(dim="xy").transpose("y", "x").rio.to_raster(OutputFolder+'/alb_pl_01_solved.tif')
+    snow.rp_direct.sel(band=0).unstack(dim="xy").transpose("y", "x").rio.to_raster(OutputFolder+'/alb_pl_01.tif')
     # for var in ['BXXX', ]:
     #     var = OLCI_scene[var].unstack(dim='xy').transpose('y', 'x').rio.to_raster(os.path.join(OutputFolder, file_name_list[var] + '.tif'))

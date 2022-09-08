@@ -6,3 +6,4 @@ out/*
 Plots/*
 Data/*
 doc/*
+*.exe

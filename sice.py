@@ -91,7 +91,7 @@ import xarray as xr
 import numba
 from constants import wls, bai, xa, ya, f0, f1, f2, bet, gam
 from constants import thv0, sol1, sol2, sol3, asol
-
+np.seterr(divide='ignore')
 np.seterr(invalid="ignore")
 os.environ["PYTROLL_CHUNK_SIZE"] = "256"
 
@@ -429,17 +429,19 @@ def f(albedo, t1t2, r0, u1, u2, albatm, r, toa):
     rs = r + surf
     return toa - rs
 
-def snow_impurities(alb_sph, al):
+def snow_impurities(snow):
     # analysis of snow impurities
     # ( the concentrations below 0.0001 are not reliable )
     # polut    normalized absorption coefficient of pollutants ay 1000nm ( in inverse mm)
     # bm    Angstroem absorption coefficient of pollutants ( around 1 - for soot, 3-7 for dust
-
-    ind_nonan = ~np.isnan(alb_sph.sel(band=0)) & ~np.isnan(alb_sph.sel(band=3))
+    r1 = snow.alb_sph.sel(band=0)
+    r2 = snow.alb_sph.sel(band=3)
     
-    p1 = np.log(alb_sph.sel(band=0)) ** 2
-    p2 = np.log(alb_sph.sel(band=3)) ** 2
-    msk = (alb_sph.sel(band=0) <= 0.999) & (alb_sph.sel(band=3) <= 0.999)
+    ind_nonan = ~np.isnan(r1) & ~np.isnan(r2)
+
+    p1 = np.log(r1) ** 2
+    p2 = np.log(r2) ** 2
+    msk = (r1 <= 0.999) & (r2 <= 0.999)
     zara = xr.where(msk, p1/p2, 1)
     
     # 1-retrieved absorption Angström exponent (AAE):
@@ -448,7 +450,7 @@ def snow_impurities(alb_sph, al):
     
     # 2-retrieved pollution load coefficient (PLC), 1/mm:
     polut = xr.where(bm > 0.9, 
-                     wls.sel(band=0) ** bm * p1 / al,
+                     wls.sel(band=0) ** bm * p1 / snow.al,
                      0)
     
     # type of pollutants
@@ -459,8 +461,13 @@ def snow_impurities(alb_sph, al):
     msk_soot = (bm > 0) & (bm < 1.2)
     aload_ppm = xr.where(msk_soot, polut / 2.06e3, 0)
     
-    # if (factor < 0.99):
-    #     nclass=3
+    msk_low_soot = msk_soot & (aload_ppm <= 2)
+    aload_ppm = xr.where(msk_low_soot, 0, aload_ppm)
+    bm = xr.where(msk_low_soot, 0, bm)
+    polut = xr.where(msk_low_soot, 0, polut)
+
+    msk = msk_soot & (snow.factor < 0.99)
+    snow['isnow'] = xr.where(msk, 3, snow.isnow)
 
     # DUST IMPURITIES:
     # 3- retrieved effective diameter of dust grains:
@@ -500,6 +507,7 @@ def snow_impurities(alb_sph, al):
     impurities["polut"] = polut.where(ind_nonan)
     impurities["bm"] = bm.where(ind_nonan)
     impurities["aload_ppm"] = aload_ppm.where(ind_nonan)
+    impurities = xr.where(snow.isnow != 3, impurities, 0)
     return impurities
 
 
@@ -894,17 +902,13 @@ def process(OLCI_scene, compute_polluted=True, **kwargs):
     OLCI_scene, snow = snow_albedo_solved(OLCI_scene, angles, aerosol, atmosphere, snow)
 
     # retrieving snow impurities
-    impurities = snow_impurities(snow.alb_sph, snow.bal)
+    impurities = snow_impurities(snow)
 
     OLCI_scene, snow = snow_albedo_direct(
         OLCI_scene, angles, aerosol, atmosphere, snow, impurities
     )
 
     snow = compute_BBA(OLCI_scene, snow, angles, compute_polluted=compute_polluted)
-
-    
-    (impurities.polut*1000).unstack(dim="xy").transpose("y", "x").rio.to_raster('./data/5_km_res/python/polut.tif')
-    impurities.bm.unstack(dim="xy").transpose("y", "x").rio.to_raster('./data/5_km_res/python/bm.tif')
     return snow
 
 
@@ -914,34 +918,22 @@ def process_by_chunk(OLCI_scene, chunk_size=150000, compute_polluted=True):
     OLCI_chunks = OLCI_scene.chunk({"band": 21, "xy": chunk_size})
     # snow_chunks = OLCI_chunks.map_blocks(process,kwargs={}, template = snow_template)
     xy_chunk_indexes = np.array(OLCI_chunks.chunks["xy"]).cumsum()
+    
+    snow = xr.Dataset()
 
-    diameter = []
-    area = []
-    rp3 = []
-    rs3 = []
-    isnow = []
-    r0 = []
-    al = []
     for i in range(len(xy_chunk_indexes) - 1):
         print(f"{i+1} / {nchunks}")
+        # define chunk
         chunk = OLCI_scene.isel(xy=slice(xy_chunk_indexes[i], xy_chunk_indexes[i + 1]))
+        # process chunk
         snow_chunk = process(chunk)
-        diameter.append(snow_chunk.diameter)
-        area.append(snow_chunk.area)
-        rp3.append(snow_chunk.rp3)
-        rs3.append(snow_chunk.rs3)
-        isnow.append(snow_chunk.isnow)
-        r0.append(snow_chunk.r0)
-        al.append(snow_chunk.r0)
+        
+        if i == 0:
+            snow = snow_chunk.copy()
+        else:
+            snow = xr.concat([snow, snow_chunk], dim="xy")
         del snow_chunk
-    snow = xr.Dataset()
-    snow["diameter"] = xr.concat(diameter, dim="xy")
-    snow["area"] = xr.concat(area, dim="xy")
-    snow["rp3"] = xr.concat(rp3, dim="xy")
-    snow["rs3"] = xr.concat(rs3, dim="xy")
-    snow["isnow"] = xr.concat(isnow, dim="xy")
-    snow["r0"] = xr.concat(r0, dim="xy")
-    snow["al"] = xr.concat(al, dim="xy")
+
     return snow
 
 
@@ -964,13 +956,11 @@ if __name__ == "__main__":
 
     start_time = time.process_time()
 
-    snow = process(OLCI_scene)
-    # snow = process_by_chunk(OLCI_scene, chunk_size=500000)
+    # snow = process(OLCI_scene)
+    snow = process_by_chunk(OLCI_scene, chunk_size=500000)
 
     duration = time.process_time() - start_time
     print("Time elapsed: ", duration)
 
     write_output(snow, OutputFolder)
-    # snow.alb_sph.sel(band=0).unstack(dim="xy").transpose("y", "x").rio.to_raster(OutputFolder+'/alb_sph_01.tif')
-    snow.alb_sph_direct.sel(band=0).unstack(dim="xy").transpose("y", "x").rio.to_raster(OutputFolder+'/alb_sph_01.tif')
 
