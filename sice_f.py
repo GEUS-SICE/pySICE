@@ -194,20 +194,27 @@ import rioxarray
 import matplotlib.pyplot as plt
 #%matplotlib qt
 import numpy as np
-
-folder_f = 'data/2019-06-14/pySICEv1.5/'
-folder_p = 'data/2019-06-14/python/'
-var_list = ["grain_diameter", "snow_specific_area",   
+data_folder = 'data/2019-06-14/'
+code_ver1 = 'pySICEv1.6'
+code_ver2 = 'pySICEv2.0'
+folder1 = data_folder+code_ver1+'/'
+folder2 =  data_folder+code_ver2+'/'
+var_list = ['isnow', "grain_diameter", "snow_specific_area",   
             "r0", "albedo_bb_planar_sw",  "albedo_bb_spherical_sw"]
 # var_list = ["isnow", "alb_sph_01", "alb_sph_01_solved", "alb_pl_01", "alb_pl_01_solved", "BOAR_01", "BOAR_01_solved"]
 plt.close('all')
 for var in var_list:
-    ds_f = rioxarray.open_rasterio(folder_f+var+'.tif').squeeze()
-    ds_p = rioxarray.open_rasterio(folder_p+var+'.tif').squeeze().interp_like(ds_f)
+    ds_f = rioxarray.open_rasterio(folder1+var+'.tif').squeeze()
+    ds_p = rioxarray.open_rasterio(folder2+var+'.tif').squeeze().interp_like(ds_f, method ='nearest')
     
     if var == 'polut':
         ds_f = np.log10(ds_f)
         ds_p = np.log10(ds_p)
+        
+    if var in ['albedo_bb_planar_sw', 'albedo_bb_spherical_sw']:
+        ds_f = ds_f.where(ds_f>0).where(ds_f<2)
+    if var == 'isnow':
+        ds_f = ds_f.where(ds_f>=0).where(ds_f<4)
 
         
     vmin = min(ds_f.min(), ds_p.min())
@@ -217,19 +224,19 @@ for var in var_list:
 
         
     ds_f.dropna('x', 'all').dropna('y', 'all').plot(ax=ax[0], vmin=vmin, vmax=vmax)
-    ax[0].set_title('pySICEv1.6')
+    ax[0].set_title(code_ver1)
     ds_p.dropna('x', 'all').dropna('y', 'all').plot(ax=ax[1], vmin=vmin, vmax=vmax)
-    ax[1].set_title('pySICEv2.1')
+    ax[1].set_title(code_ver2)
     
     (ds_p-ds_f).dropna('x', 'all').dropna('y', 'all').plot(ax=ax[2])
-    ax[2].set_title('python - fortran')
+    ax[2].set_title(code_ver2+' - '+code_ver1)
 
-    ax[3].plot(ds_f.where((ds_p-ds_f).notnull()).values.flatten(),
-               ds_p.where((ds_p-ds_f).notnull()).values.flatten(),
+    ax[3].plot(ds_f.values.flatten(),
+               ds_p.values.flatten(),
                marker ='.', linestyle='None')
     ax[3].plot([ds_f.min(), ds_f.max()], [ds_f.min(), ds_f.max()],color='k')
-    ax[3].set_xlabel('fortran')
-    ax[3].set_ylabel('python')
+    ax[3].set_xlabel(code_ver1)
+    ax[3].set_ylabel(code_ver2)
     
 
     
