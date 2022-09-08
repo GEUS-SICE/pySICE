@@ -118,37 +118,25 @@ def process(OLCI_scene, compute_polluted=True, **kwargs):
 def process_by_chunk(OLCI_scene, chunk_size=150000, compute_polluted=True):
     size = OLCI_scene.sza.shape[0]
     nchunks = int(max(np.floor(size / chunk_size), 1))
-    OLCI_chunks = OLCI_scene.chunk({'band': 21, 'xy': chunk_size})
+    OLCI_chunks = OLCI_scene.chunk({"band": 21, "xy": chunk_size})
     # snow_chunks = OLCI_chunks.map_blocks(process,kwargs={}, template = snow_template)
-    xy_chunk_indexes = np.array(OLCI_chunks.chunks['xy']).cumsum()
-
-    diameter = []
-    area = []
-    rp3 = []
-    rs3 = []
-    isnow = []
-    r0 = []
-    al = []
-    for i in range(len(xy_chunk_indexes)-1):
-        print(f"{i+1} / {nchunks}")
-        chunk = OLCI_scene.isel(xy=slice(xy_chunk_indexes[i], xy_chunk_indexes[i+1]))
-        snow_chunk = process(chunk)
-        diameter.append(snow_chunk.diameter)
-        area.append(snow_chunk.area)
-        rp3.append(snow_chunk.rp3)
-        rs3.append(snow_chunk.rs3)
-        isnow.append(snow_chunk.isnow)
-        r0.append(snow_chunk.r0)
-        al.append(snow_chunk.r0)
-        del snow_chunk
+    xy_chunk_indexes = np.array(OLCI_chunks.chunks["xy"]).cumsum()
+    
     snow = xr.Dataset()
-    snow['diameter'] = xr.concat(diameter, dim='xy')
-    snow['area'] = xr.concat(area, dim='xy')
-    snow['rp3'] = xr.concat(rp3, dim='xy')
-    snow['rs3'] = xr.concat(rs3, dim='xy')
-    snow['isnow'] = xr.concat(isnow, dim='xy')
-    snow['r0'] = xr.concat(r0, dim='xy')
-    snow['al'] = xr.concat(al, dim='xy')
+
+    for i in range(len(xy_chunk_indexes) - 1):
+        print(f"{i+1} / {nchunks}")
+        # define chunk
+        chunk = OLCI_scene.isel(xy=slice(xy_chunk_indexes[i], xy_chunk_indexes[i + 1]))
+        # process chunk
+        snow_chunk = process(chunk)
+        
+        if i == 0:
+            snow = snow_chunk.copy()
+        else:
+            snow = xr.concat([snow, snow_chunk], dim="xy")
+        del snow_chunk
+
     return snow
 
 

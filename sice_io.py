@@ -267,34 +267,27 @@ class sice_io(object):
             output_path, _ = os.path.splitext(output_path)
         ds.to_zarr(output_path + '.OUT.zarr', mode=mode, append_dim=append_dim, encoding=encodings, consolidated=True)
 
-    # def to_csv(self):
-    #     # %% Output
-    #     print('\nText file output')
-    #     # data_in = pd.read_csv(sys.argv[1])
-    #     data_out = data_in
-    #     data_out['grain_diameter'] = self.diameter
-    #     # data_out['snow_specific_area']=area
-    #     data_out['al'] = self.al
-    #     data_out['r0'] = self.r0
-    #     data_out['diagnostic_retrieval'] = self.isnow
-    #     data_out['conc'] = self.conc
-    #     data_out['albedo_bb_planar_sw'] = self.rp3
-    #     data_out['albedo_bb_spherical_sw'] = self.rs3
-    #     for i in np.append(np.arange(11), np.arange(15,21)):
-    #     # for i in np.arange(21):
-    #         data_out['albedo_spectral_spherical_' + str(i + 1).zfill(2)] = self.alb_sph[i,:,:]
-    #     for i in np.append(np.arange(11), np.arange(15,21)):
-    #         data_out['rBRR_'+str(i+1).zfill(2)] = self.rp[i,:,:]
-    #     basename, ext = os.path.splitext(self.filename)
-    #        data_out.to_csv(basename + '_out.csv')
-
 
 def write_output(snow, OutputFolder):
-    file_name_list = {'BXXX': 'O3_SICE',   'diameter': 'grain_diameter', 'area': 'snow_specific_area',
-                      'al': 'al', 'r0': 'r0', 'isnow': 'diagnostic_retrieval', 'conc': 'conc',
-                      'rp3': 'albedo_bb_planar_sw', 'rs3': 'albedo_bb_spherical_sw'}
-    for var in ['diameter', 'area', 'rp3', 'rs3', 'isnow', 'r0', 'al']:
-        snow[var].unstack(dim='xy').transpose('y', 'x').rio.to_raster(os.path.join(OutputFolder, file_name_list[var] + '.tif'))
-
+    file_name_list = {
+        "BXXX": "O3_SICE",
+        "diameter": "grain_diameter",
+        "area": "snow_specific_area",
+        "al": "al",
+        "r0": "r0",
+        "isnow": "isnow",
+        "conc": "conc",
+        "rp3": "albedo_bb_planar_sw",
+        "rs3": "albedo_bb_spherical_sw",
+        "factor": "factor",
+    }
+    print('Printing out:')
+    for var in ["diameter", "area", "rp3", "rs3", "isnow", "r0", "al"]:
+        print(var)
+        snow[var].unstack(dim="xy").transpose("y", "x").rio.to_raster(
+            os.path.join(OutputFolder, file_name_list[var] + ".tif")
+        )
+    snow.alb_sph.sel(band=0).unstack(dim="xy").transpose("y", "x").rio.to_raster(OutputFolder+'/alb_sph_01_solved.tif')
+    snow.rp.sel(band=0).unstack(dim="xy").transpose("y", "x").rio.to_raster(OutputFolder+'/alb_pl_01_solved.tif')
     # for var in ['BXXX', ]:
     #     var = OLCI_scene[var].unstack(dim='xy').transpose('y', 'x').rio.to_raster(os.path.join(OutputFolder, file_name_list[var] + '.tif'))
