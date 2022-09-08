@@ -8,7 +8,7 @@ c                  RETRIEVAL OF SNOW PROPERTIES
 c                  USING OLCI     
 c                  a.a.kokhanovsky@gmail.com
 c                  August 20, 2022
-c                  Version 6.3 (search: bav)
+c                  Version 6.2 (search: bav)
 c***********************************************
      
       REAL TOA(21),KAPPA(21),CALIB(21),alkas(21),alpha(21)
@@ -968,11 +968,11 @@ c                     **OUTPUT**
                
         
 
-c       update bav 2022        
+       
           if (powe.lt.0.9)  aload1 =0.0
-          if (powe.lt.0.9)  powe=   0.0
-          if (powe.gt.10.)  aload1= 0.0
           if (powe.gt.10.)  powe=   0.0
+          if (powe.gt.10.)  aload1= 0.0
+          if (powe.lt.0.9)  powe=   0.0
  
                   
 22022    continue

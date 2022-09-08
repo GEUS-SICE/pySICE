@@ -968,7 +968,7 @@ c                     **OUTPUT**
                
         
 
-c       update bav 2022        
+       
           if (powe.lt.0.9)  aload1 =0.0
           if (powe.lt.0.9)  powe=   0.0
           if (powe.gt.10.)  aload1= 0.0

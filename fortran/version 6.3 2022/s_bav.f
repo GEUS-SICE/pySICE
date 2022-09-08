@@ -5,11 +5,11 @@ c                  RETRIEVAL OF SNOW PROPERTIES
 c                  USING OLCI     
 c                  a.a.kokhanovsky@gmail.com
 c                  August 20, 2022
-c                  Version 6.2
+c                  Version 6.3.1
 c***********************************************
       REAL TOA(21),KAPPA(21),CALIB(21),alkas(21),alpha(21)
       REAL CTOA(21),BCTOA(21),answ2(21),answer(21),pa(21),boa(21)
-      REAL TOK(21),F(21),cabsoz(21),panswer(21),botswer(21)
+      REAL TOK(21),F(21),cabsoz(21),PAnswer(21),botswer(21)
       REAL albs(21),albp(21),botka(21)
       COMMON sza,vza,raa, am1,am2,u1,u2,co,
      c  alam,reflec,height,aot,anna,pi,r0,tauaer,
@@ -53,9 +53,9 @@ c     output files:
        open(1003,file= 'spectral_BOAR.dat')
 c     main output after postprocessing
        open(7004, file='output_snow_parameters_post.dat')
-       open(7001,file= 'output_spectral_spherical_albedo_post.dat')
-       open(7002, file='output_spectral_plane_albedo_post.dat') 
-       open(7003, file='output_spectral_BOAR_post.dat')
+       open(7001,file= 'spectral_spherical_albedo_solved.dat')
+       open(7002, file='spectral_plane_albedo_solved.dat') 
+       open(7003, file='spectral_BOAR_solved.dat')
                    
        pi=acos(-1.)
 c    relative vertical optical density of ozone f at all OLCI channels
@@ -236,8 +236,7 @@ c     and bottom of atmosphere reflectance
 c     at all channels for 100% and partially snow covered pixels:
        do 9025 JJ=1,21
           answ2(jj)  = factor*answer(jj)
-          panswer(jj)= factor*(answer(jj)**u1)
-          pa(jj)     = panswer(jj)
+          pa(jj)     = factor*(answer(jj)**u1)
           botswer(jj)= factor*r0*answer(jj)**(u1*u2/r0) 
  9025  continue
  
@@ -253,8 +252,9 @@ c            STEP_3_2                     *
 c     retrieval of properties of          *
 c     snow impurities + load of impurities*                    
 c******************************************
-      aload1=0; powe=0; polut=0; absor1=0; absef660=0
-      absor1000=0; deff=0.0; absef660=0.0; absor1000=0.0
+      aload1=0.; powe=0.; polut=0.; absor1=0.; absef660=0.
+      absor1000=0.; deff=0.0; absef660=0.0; absor1000=0.0
+      if (nclass.eq.3)   go to 7754
       r1=answer(1)
       r2=answer(4)
       zara=1.
@@ -310,11 +310,6 @@ c     special case of soot  pollution:
  1941              continue
       NPOLE=2; aload1=0.; deff=0.
       absor1=0; absef660=0.; absor1000=0.
-      if (powe.lt.0.0) NCLASS=1
-      if (powe.lt.0.0) polut=0
-      if (powe.lt.0.0) powe=0
-      if (powe.lt.0.0) go to 1942
-
       aco=2.06e+3
       aload1=polut/aco
       if (factor.lt.0.99) nclass=3
@@ -386,6 +381,7 @@ c          asymmetry parameter
                        wave0=0.4685                       
                        gaer=g0+g1*exp(-alam/wave0)
                        g=tauaer*gaer/tau
+
                     refatm=func1(tau)
                     tatm=  func2(tau)
                     albatm=func3(tau)
@@ -445,9 +441,9 @@ c          quality of retrievals and print of retrieved snow characteristics
 c                     **OUTPUT**
 3092          format(i5,2x,2e12.4,i3,f8.4,20(2x,f8.4))
           if (powe.lt.0.9)  aload1 =0.0
-          if (powe.gt.10.)  powe=   0.0
-          if (powe.gt.10.)  aload1= 0.0
           if (powe.lt.0.9)  powe=   0.0
+          if (powe.gt.10.)  aload1= 0.0
+          if (powe.gt.10.)  powe=   0.0
 
         DIFKA=abs(difoz)
         NBARE=0
@@ -486,7 +482,6 @@ c     retrieved TOC,ECMWF TOC, difference(%),cv1,cv2
 c     *****    output: postprocessing *****
 c     only if it passes the quality test
 
-       if (ccv2.gt.THV1.or.diam.lt.THV2.or.DIFKA.gt.THV3) go to 932
         WRITE(7004,*) j,alat,alon,   
      c NCLASS,factor,diam,ssa,dlina,r0,aload1,powe,polut,
      c deff,absor1,absef660,absor1000,
@@ -494,11 +489,10 @@ c     only if it passes the quality test
      c ratka,npole,nbare,nsnow,sza,vza,raa,toa(1),toa(21),
      c tocos,akozon,difka,cv1,cv2 
 	 
-        WRITE(7001,*) j,alat,alon, NCLASS,factor,(albs(ir),ir=1,21)  
-        WRITE(7002,*) j,alat,alon, NCLASS,factor,(albp(ir),ir=1,21)     
-        WRITE(7003,*) j,alat,alon, NCLASS,factor,(botka(ir),ir=1,21)
+        WRITE(7001,*) j,alat,alon, NCLASS,factor,(answ2(ir),ir=1,21)  
+        WRITE(7002,*) j,alat,alon, NCLASS,factor,(pa(ir),ir=1,21)     
+        WRITE(7003,*) j,alat,alon, NCLASS,factor,(botswer(ir),ir=1,21)
 		
-932        continue
 87        continue
       STOP
       END
