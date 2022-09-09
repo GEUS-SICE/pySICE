@@ -192,9 +192,10 @@ output_sice_f(
 import xarray as xr
 import rioxarray
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 #%matplotlib qt
 import numpy as np
-data_folder = 'data/2019-06-14/'
+data_folder = 'data/5_km_res/'
 code_ver1 = 'pySICEv1.6'
 code_ver2 = 'pySICEv2.0'
 folder1 = data_folder+code_ver1+'/'
@@ -203,7 +204,7 @@ var_list = ['isnow', "grain_diameter", "snow_specific_area",
             "r0", "albedo_bb_planar_sw",  "albedo_bb_spherical_sw"]
 # var_list = ["isnow", "alb_sph_01", "alb_sph_01_solved", "alb_pl_01", "alb_pl_01_solved", "BOAR_01", "BOAR_01_solved"]
 plt.close('all')
-for var in var_list:
+for var in var_list[0:1]:
     ds_f = rioxarray.open_rasterio(folder1+var+'.tif').squeeze()
     ds_p = rioxarray.open_rasterio(folder2+var+'.tif').squeeze().interp_like(ds_f, method ='nearest')
     
@@ -213,19 +214,28 @@ for var in var_list:
         
     if var in ['albedo_bb_planar_sw', 'albedo_bb_spherical_sw']:
         ds_f = ds_f.where(ds_f>0).where(ds_f<2)
-    if var == 'isnow':
-        ds_f = ds_f.where(ds_f>=0).where(ds_f<4)
-
-        
+    
     vmin = min(ds_f.min(), ds_p.min())
     vmax = max(ds_f.max(), ds_p.max())
+    
+    if var == 'isnow':
+        ds_f = ds_f.where(ds_f>=0).where(ds_f<10)
+        vmin = min(ds_f.min(), ds_p.min())-0.5
+        vmax = max(ds_f.max(), ds_p.max())+0.5
+        isnow = ds_p
+        param = {'cmap':cm.get_cmap('gnuplot', vmax-vmin),
+                 'cbar_kwargs':{'ticks': np.arange(vmax-vmin)}}
+
+    else:
+        param = {}
+
     fig, ax = plt.subplots(2,2, figsize=(15,15))
     ax=ax.flatten()
 
         
-    ds_f.dropna('x', 'all').dropna('y', 'all').plot(ax=ax[0], vmin=vmin, vmax=vmax)
+    ds_f.dropna('x', 'all').dropna('y', 'all').plot(ax=ax[0], vmin=vmin, vmax=vmax,**param )
     ax[0].set_title(code_ver1)
-    ds_p.dropna('x', 'all').dropna('y', 'all').plot(ax=ax[1], vmin=vmin, vmax=vmax)
+    ds_p.dropna('x', 'all').dropna('y', 'all').plot(ax=ax[1], vmin=vmin, vmax=vmax,**param )
     ax[1].set_title(code_ver2)
     
     (ds_p-ds_f).dropna('x', 'all').dropna('y', 'all').plot(ax=ax[2])

@@ -84,7 +84,7 @@ if __name__ == '__main__':
     # if the script is called from the command line, then parsing the input path and
     # passing it to the main function
     InputPath = sys.argv[1]
-    if len(sys.argv) > 3:
+    if len(sys.argv) == 3:
         OutputFolder = sys.argv[2]
     else:
         OutputFolder = sys.argv[1] + '/'
@@ -98,8 +98,8 @@ if __name__ == '__main__':
 
     start_time = time.process_time()
 
-    # snow = sl.process(OLCI_scene)
-    snow = sl.process_by_chunk(OLCI_scene, chunk_size=500000)
+    snow = sl.process(OLCI_scene)
+    # snow = sl.process_by_chunk(OLCI_scene, chunk_size=500000)
 
     duration = time.process_time() - start_time
     print('Time elapsed: ', duration)
