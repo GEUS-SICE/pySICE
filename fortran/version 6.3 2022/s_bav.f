@@ -5,17 +5,17 @@ c                  RETRIEVAL OF SNOW PROPERTIES
 c                  USING OLCI     
 c                  a.a.kokhanovsky@gmail.com
 c                  August 20, 2022
-c                  Version 6.3.1
+c                  Version 6.3.2
 c***********************************************
       REAL TOA(21),KAPPA(21),CALIB(21),alkas(21),alpha(21)
       REAL CTOA(21),BCTOA(21),answ2(21),answer(21),pa(21),boa(21)
-      REAL TOK(21),F(21),cabsoz(21),PAnswer(21),botswer(21)
+      REAL TOK(21),F(21),cabsoz(21),botswer(21)
       REAL albs(21),albp(21),botka(21)
       COMMON sza,vza,raa, am1,am2,u1,u2,co,
      c  alam,reflec,height,aot,anna,pi,r0,tauaer,
      c  taumol,gaer,t620,MOLEC,refatm, tatm, albatm
       COMMON /CD/ WELT
-      COMMON /ANS/ ANSW2,PAnswer
+      COMMON /ANS/ ANSW2,pa
       COMMON/ANB/ albs,albp
       EXTERNAL fun,zbrent,func1,func2,func3
 c******************************************************************
@@ -254,7 +254,7 @@ c     snow impurities + load of impurities*
 c******************************************
       aload1=0.; powe=0.; polut=0.; absor1=0.; absef660=0.
       absor1000=0.; deff=0.0; absef660=0.0; absor1000=0.0
-      if (nclass.eq.3)   go to 7754
+
       r1=answer(1)
       r2=answer(4)
       zara=1.

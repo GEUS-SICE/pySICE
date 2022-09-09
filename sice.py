@@ -151,11 +151,11 @@ def prepare_processing(OLCI_scene, angles):
     snow = xr.Dataset()
     snow["isnow"] = OLCI_scene['sza']*np.nan
     # snow["isnow"] = xr.where(OLCI_scene.toa[20] < 0.1, 102, np.nan)
-    snow["isnow"] = xr.where(OLCI_scene['sza'].isnull(), 999, np.nan)
+    snow["isnow"] = xr.where(OLCI_scene['sza'].isnull(), np.nan, 999)
     # snow.isnow[OLCI_scene.toa[0] < 0.2] = 103
     # snow.isnow[OLCI_scene.sza > 75] = 100
 
-    mask = np.isnan(snow.isnow)
+    mask = (snow.isnow==999)
     OLCI_scene["toa"] = OLCI_scene.toa.where(mask)
     OLCI_scene["vaa"] = OLCI_scene.vaa.where(mask)
     OLCI_scene["saa"] = OLCI_scene.saa.where(mask)
@@ -172,9 +172,11 @@ def prepare_processing(OLCI_scene, angles):
     )
 
     # case of not 100% snow cover:
+    ind_nonan = snow.isnow.notnull()
     msk = OLCI_scene.toa.sel(band=0) < thv0
     snow.isnow[msk] = 3
     snow.isnow[~msk] = 1
+    snow['isnow'] = snow.isnow.where(ind_nonan)
     # scaling factor for patchy snow at 400nm
     psi = rinff(angles["cos_sza"], angles["cos_vza"], angles["theta"])
     # factor=snow fraction ( SMALLER THAN 1.0):
@@ -411,7 +413,7 @@ def snow_albedo_solved(OLCI_scene, angles, aerosol, atmosphere, snow):
     )
     snow["alb_sph"] = snow["factor"] * snow["alb_sph"]
     
-    ind_no_nan = snow["isnow"]!=999
+    ind_no_nan = snow["isnow"].notnull()
     snow["isnow"] = xr.where(snow.alb_sph.sel(band=0) > 0.98, 1, snow.isnow)
     snow["isnow"] = xr.where(
         (snow.alb_sph.sel(band=0) <= 0.98) & (snow.factor > 0.99), 2, snow.isnow
@@ -956,8 +958,8 @@ if __name__ == "__main__":
 
     start_time = time.process_time()
 
-    # snow = process(OLCI_scene)
-    snow = process_by_chunk(OLCI_scene, chunk_size=500000)
+    snow = process(OLCI_scene)
+    # snow = process_by_chunk(OLCI_scene, chunk_size=500000)
 
     duration = time.process_time() - start_time
     print("Time elapsed: ", duration)
