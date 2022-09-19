@@ -199,7 +199,7 @@ import numpy as np
 #code_ver1 = 'pySICEv1.6'
 #code_ver2 = 'pySICEv2.0'
 data_folder = 'data/5_km_res/'
-code_ver1 = 'fortran'
+code_ver1 = 'pySICEv1.6'
 code_ver2 = 'pySICEv2.0'
 folder1 = data_folder+code_ver1+'/'
 folder2 =  data_folder+code_ver2+'/'
@@ -207,9 +207,9 @@ var_list = ['isnow', "grain_diameter", "snow_specific_area",
             "r0", "albedo_bb_planar_sw",  "albedo_bb_spherical_sw"]
 # var_list = ["isnow", "alb_sph_01", "alb_sph_01_solved", "alb_pl_01", "alb_pl_01_solved", "BOAR_01", "BOAR_01_solved"]
 plt.close('all')
-for var in var_list[0:1]:
+for var in var_list:
     ds_f = rioxarray.open_rasterio(folder1+var+'.tif').squeeze()
-    ds_p = rioxarray.open_rasterio(folder2+var+'.tif').squeeze().interp_like(ds_f, method ='nearest')
+    ds_p = rioxarray.open_rasterio(folder2+var+'.tif').squeeze()
     
     if var == 'polut':
         ds_f = np.log10(ds_f)
@@ -222,16 +222,16 @@ for var in var_list[0:1]:
     vmax = max(ds_f.max(), ds_p.max())
     
     if var == 'isnow':
-        ds_f = ds_f.where(ds_f>=0).where(ds_f<4)
-        isnow = ds_p
-        param = {'cmap':cm.get_cmap('PiYG', 3),
-                 'cbar_kwargs':{'ticks': [1, 2, 3]}}
+        ds_f = ds_f.where(ds_f>=0).where(ds_f<10)+1
+        ds_f=ds_f.rename('isnow')
+        isnow = ds_p.copy()
+        num_class = np.max(ds_f.values[ds_f.notnull()])
+        param = {'cmap':cm.get_cmap('PiYG', num_class),
+                 'cbar_kwargs':{'ticks': np.arange(num_class+1)}}
         vmin = min(ds_f.min(), ds_p.min())-0.5
         vmax = max(ds_f.max(), ds_p.max())+0.5
     else:
         param = {}
-
-        
 
     fig, ax = plt.subplots(2,2, figsize=(15,15))
     ax=ax.flatten()
@@ -242,22 +242,48 @@ for var in var_list[0:1]:
     ds_p.dropna('x', 'all').dropna('y', 'all').plot(ax=ax[1], vmin=vmin, vmax=vmax,**param)
     ax[1].set_title(code_ver2)
     
-    (ds_p-ds_f).dropna('x', 'all').dropna('y', 'all').plot(ax=ax[2])
+    (ds_p-ds_f).dropna('x', 'all').dropna('y', 'all').plot(ax=ax[2], cbar_kwargs={'label': code_ver2+' - '+code_ver1})
     ax[2].set_title(code_ver2+' - '+code_ver1)
 
     ax[3].plot(ds_f.where(isnow==1).values.flatten(),
                ds_p.where(isnow==1).values.flatten(),
-               marker ='.', linestyle='None')
+               marker ='.', linestyle='None', label='clean pixels')
     ax[3].plot(ds_f.where(isnow==2).values.flatten(),
                ds_p.where(isnow==2).values.flatten(),
-               marker ='.', linestyle='None')
+               marker ='.', linestyle='None', label='polluted pixels')
     ax[3].plot(ds_f.where(isnow==3).values.flatten(),
                ds_p.where(isnow==3).values.flatten(),
-               marker ='.', linestyle='None')
-
+               marker ='.', linestyle='None', label='mixed pixels')
+    ax[3].legend(title='pixel class in '+code_ver2)
     ax[3].plot([ds_f.min(), ds_f.max()], [ds_f.min(), ds_f.max()],color='k')
     ax[3].set_xlabel(code_ver1)
     ax[3].set_ylabel(code_ver2)
+    ax[3].set_title(var)
+    for i in range(3):
+        ax[i].xaxis.set_ticklabels([]) 
+        ax[i].yaxis.set_ticklabels([]) 
+        ax[i].set_xlabel('')
+        ax[i].set_ylabel('')
+        
+    fig, ax = plt.subplots(1,1, figsize=(15,15))
+    ax.plot(np.arange(len(ds_p.values.flatten())),
+               100*(-ds_f.where(isnow==1).values.flatten() + ds_p.where(isnow==1).values.flatten())/ds_f.where(isnow==1).values.flatten(),
+               marker ='.', linestyle='None', label='clean pixels')
+    ax.plot(np.arange(len(ds_p.values.flatten())),
+               100*(-ds_f.where(isnow==2).values.flatten() + ds_p.where(isnow==2).values.flatten())/ds_f.where(isnow==2).values.flatten(),
+               marker ='.', linestyle='None', label='polluted pixels')
+    ax.plot(np.arange(len(ds_p.values.flatten())),
+               100*(-ds_f.where(isnow==3).values.flatten() + ds_p.where(isnow==3).values.flatten())/ds_f.where(isnow==3).values.flatten(),
+               marker ='.', linestyle='None', label='mixed pixels')
+    ax.plot(np.arange(len(ds_p.values.flatten()))[ds_p.notnull().values.flatten()],
+            np.arange(len(ds_p.values.flatten()))[ds_p.notnull().values.flatten()]*0, 'k', linestyle='--')
+    ax.legend(title='pixel class in '+code_ver2)
+    ax.set_xlim(np.min(np.arange(len(ds_p.values.flatten()))[ds_p.notnull().values.flatten()]),
+                np.max(np.arange(len(ds_p.values.flatten()))[ds_p.notnull().values.flatten()]))
+    ax.set_ylabel(code_ver2+' - '+code_ver1)
+    ax.set_title(var)
+
+        
     
 
     

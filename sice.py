@@ -23,6 +23,12 @@
 # -compression of output
 # - new backscatter fraction from Alex
 # - new format for tg_vod.dat file
+# **************************************************
+#              How to run
+# from command line:
+#    > python sice.py [input data folder] [output folder]
+# from spyder consol
+#    > %run sice.py [input data folder] [output folder]
 #
 # **************************************************
 # Inputs:
@@ -245,7 +251,7 @@ def aerosol_properties(height, cos_sa, aot=0.07):
     # taumol = wls**(-4.05) * np.minimum(1, np.exp(-height / 7400)) * 0.00877
     # MOLEC = 1 version:
     taumol = 0.008735 * wls ** (-4.08)
-    taumol = xr.where((height/6000)>0,
+    taumol = xr.where((height / 6000) > 0,
                       taumol*np.exp(-height / 6000),
                       taumol)
     # MOLEC = 0 version:
@@ -958,8 +964,10 @@ if __name__ == "__main__":
 
     start_time = time.process_time()
 
-    snow = process(OLCI_scene)
-    # snow = process_by_chunk(OLCI_scene, chunk_size=500000)
+    if len(OLCI_scene.xy)<1000000:
+        snow = process(OLCI_scene)
+    else:
+        snow = process_by_chunk(OLCI_scene, chunk_size=500000)
 
     duration = time.process_time() - start_time
     print("Time elapsed: ", duration)

@@ -466,7 +466,7 @@ anna = 1.3
 molec = 0
 jend = 100  # number of pixels to be printed (with spectral data)
 # patchy snow threshold for the channel R(400nm)
-thv0 = 0.5
+thv0 = 0.74
 # threshold for the measured and simulated spectra differences
 thv1 = 10.0
 # threshold for the grain diameter
