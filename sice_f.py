@@ -199,8 +199,8 @@ import numpy as np
 #code_ver1 = 'pySICEv1.6'
 #code_ver2 = 'pySICEv2.0'
 data_folder = 'data/5_km_res/'
-code_ver1 = 'pySICEv1.6'
-code_ver2 = 'pySICEv2.0'
+code_ver1 = 'fortran'
+code_ver2 = 'pySICEv2.0_int'
 folder1 = data_folder+code_ver1+'/'
 folder2 =  data_folder+code_ver2+'/'
 var_list = ['isnow', "grain_diameter", "snow_specific_area",   
@@ -222,7 +222,8 @@ for var in var_list:
     vmax = max(ds_f.max(), ds_p.max())
     
     if var == 'isnow':
-        ds_f = ds_f.where(ds_f>=0).where(ds_f<10)+1
+        if 'pySICE' in code_ver1:
+            ds_f = ds_f.where(ds_f>=0).where(ds_f<10)+1
         ds_f=ds_f.rename('isnow')
         isnow = ds_p.copy()
         num_class = np.max(ds_f.values[ds_f.notnull()])
@@ -244,7 +245,8 @@ for var in var_list:
     
     (ds_p-ds_f).dropna('x', 'all').dropna('y', 'all').plot(ax=ax[2], cbar_kwargs={'label': code_ver2+' - '+code_ver1})
     ax[2].set_title(code_ver2+' - '+code_ver1)
-
+    ds_f = ds_f.where(ds_p.notnull())
+    ds_p = ds_p.where(ds_f.notnull())
     ax[3].plot(ds_f.where(isnow==1).values.flatten(),
                ds_p.where(isnow==1).values.flatten(),
                marker ='.', linestyle='None', label='clean pixels')
@@ -254,7 +256,7 @@ for var in var_list:
     ax[3].plot(ds_f.where(isnow==3).values.flatten(),
                ds_p.where(isnow==3).values.flatten(),
                marker ='.', linestyle='None', label='mixed pixels')
-    ax[3].legend(title='pixel class in '+code_ver2)
+    ax[3].legend(title='pixel class in '+code_ver2,loc='upper right')
     ax[3].plot([ds_f.min(), ds_f.max()], [ds_f.min(), ds_f.max()],color='k')
     ax[3].set_xlabel(code_ver1)
     ax[3].set_ylabel(code_ver2)
@@ -264,7 +266,8 @@ for var in var_list:
         ax[i].yaxis.set_ticklabels([]) 
         ax[i].set_xlabel('')
         ax[i].set_ylabel('')
-        
+    
+
     fig, ax = plt.subplots(1,1, figsize=(15,15))
     ax.plot(np.arange(len(ds_p.values.flatten())),
                100*(-ds_f.where(isnow==1).values.flatten() + ds_p.where(isnow==1).values.flatten())/ds_f.where(isnow==1).values.flatten(),
@@ -276,8 +279,11 @@ for var in var_list:
                100*(-ds_f.where(isnow==3).values.flatten() + ds_p.where(isnow==3).values.flatten())/ds_f.where(isnow==3).values.flatten(),
                marker ='.', linestyle='None', label='mixed pixels')
     ax.plot(np.arange(len(ds_p.values.flatten()))[ds_p.notnull().values.flatten()],
-            np.arange(len(ds_p.values.flatten()))[ds_p.notnull().values.flatten()]*0, 'k', linestyle='--')
-    ax.legend(title='pixel class in '+code_ver2)
+            np.arange(len(ds_p.values.flatten()))[ds_p.notnull().values.flatten()]*0, 'k', linestyle='--')        
+    ax.plot(np.arange(len(ds_p.values.flatten()))[ds_p.notnull().values.flatten()],
+            np.arange(len(ds_p.values.flatten()))[ds_p.notnull().values.flatten()]*0+((ds_p-ds_f)/ds_f*100).mean().values, 'k', linestyle='--')
+    ax.legend(title='pixel class in '+code_ver2,loc='upper right')
+    print(var, ((ds_p.where(isnow!=3)-ds_f.where(isnow!=3))/ds_f*100).mean().values)
     ax.set_xlim(np.min(np.arange(len(ds_p.values.flatten()))[ds_p.notnull().values.flatten()]),
                 np.max(np.arange(len(ds_p.values.flatten()))[ds_p.notnull().values.flatten()]))
     ax.set_ylabel(code_ver2+' - '+code_ver1)

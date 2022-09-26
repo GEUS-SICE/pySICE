@@ -96,7 +96,7 @@ import os
 import xarray as xr
 import numba
 from constants import wls, bai, xa, ya, f0, f1, f2, bet, gam
-from constants import thv0, sol1, sol2, sol3, asol
+from constants import thv0, sol_vis, sol_nir, sol_sw, asol
 np.seterr(divide='ignore')
 np.seterr(invalid="ignore")
 os.environ["PYTROLL_CHUNK_SIZE"] = "256"
@@ -535,10 +535,7 @@ def snow_albedo_direct(OLCI_scene, angles, aerosol, atmosphere, snow, impurities
 
 
 def compute_BBA(OLCI_scene, snow, angles, compute_polluted=True):
-    ind_all_clean = snow.isnow == 1
-
     # CalCULATION OF BBA of clean snow
-
     # Original method: Recalculating spectrum and integrating it.
     # This is the exact, but slow mehtod to calculate clean snow BBA.
     # For each clean pixel, the derived spectrum is caluclated from u1, al and
@@ -549,33 +546,58 @@ def compute_BBA(OLCI_scene, snow, angles, compute_polluted=True):
     # p1,p2,s1,s2 = BBA_v(al[ind_all_clean], u1[ind_all_clean])
     #
     # visible(0.3-0.7micron)
-    # rp1[ind_all_clean]=p1/sol1
-    # rs1[ind_all_clean]=s1/sol1
+    # rp1[ind_all_clean]=p1/sol_vis
+    # rs1[ind_all_clean]=s1/sol_vis
     # near-infrared (0.7-2.4micron)
-    # rp2[ind_all_clean]=p2/sol2
-    # rs2[ind_all_clean]=s2/sol2
+    # rp2[ind_all_clean]=p2/sol_nir
+    # rs2[ind_all_clean]=s2/sol_nir
     # shortwave(0.3-2.4 micron)
-    # rp3[ind_all_clean]=(p1+p2)/sol3
-    # rs3[ind_all_clean]=(s1+s2)/sol3
+    # rp3[ind_all_clean]=(p1+p2)/sol_sw
+    # rs3[ind_all_clean]=(s1+s2)/sol_sw
 
     # approximation
-    # old version:
-    # snow['rp3'] = plane_albedo_sw_approx(snow.diameter, angles.cos_sza).where(ind_all_clean)
-    # snow['rs3'] = spher_albedo_sw_approx(snow.diameter).where(ind_all_clean)
+    # 2022 exact:
+    snow['rp3'] = snow['al']*np.nan
+    snow['rs3'] = snow['al']*np.nan
+    
+    ind_clean = (snow.isnow == 1) 
+    iind_clean = np.arange(len(ind_clean))[ind_clean]
+    from progressbar import progressbar
+    for i in progressbar(iind_clean):
+        if np.isnan(snow.al[{'xy':i}]):
+            continue
 
-    # Update 2022:
+        _, _, snow.rp3[{'xy':i}] = BBA_calc_clean(float(snow.al[{'xy':i}].values),
+                                                  float(angles.u1[{'xy':i}].values), mode='planar')
+        _, _, snow.rs3[{'xy':i}] = BBA_calc_clean(snow.al[{'xy':i}].values,
+                                                  angles.u1[{'xy':i}].values, mode='spherical')
+
+    # 2022 approximation:
     # planar albedo
     # rp1 and rp2 not derived anymore
-    snow["rp3"] = 0.5271 + 0.3612 * np.exp(-angles.u1 * np.sqrt(0.02350 * snow.al))
+    # snow["rp3"] = 0.5271 + 0.3612 * np.exp(-angles.u1 * np.sqrt(0.02350 * snow.al))
     # rvis = np.exp(-angles.u1*np.sqrt (7.86e-5*snow.al))
     # rnir = 0.2335+0.56*np.exp(-angles.u1*np.sqrt(0.0327*snow.al))
 
-    #     spherical albedo
+    # spherical albedo
     # rs1 and rs2 not derived anymore
-    snow["rs3"] = 0.5271 + 0.3612 * np.exp(-np.sqrt(0.02350 * snow.al))
+    # snow["rs3"] = 0.5271 + 0.3612 * np.exp(-np.sqrt(0.02350 * snow.al))
     # rviss = np.exp(-np.sqrt (7.86e-5*snow.al))
     # rnirs = 0.2335+0.56*np.exp(-np.sqrt(0.0327*snow.al))
 
+    if compute_polluted:
+        # calculation of the BBA for the polluted snow
+        ind_pol = (snow.isnow == 2) | (snow.isnow == 3)
+        iind_pol = dict(xy=np.arange(len(ind_pol))[ind_pol])
+
+        # rp1[iind_pol], rp2[iind_pol], rp3[iind_pol] = BBA_calc_pol(rp[iind_pol], asol, sol_vis, sol_nir, sol_sw)
+        # rs1[iind_pol], rs2[iind_pol], rs3[iind_pol] = BBA_calc_pol(alb_sph[iind_pol], asol, sol_vis, sol_nir, sol_sw)
+        _, _, snow.rp3[iind_pol] = BBA_calc_pol(
+            snow.rp[iind_pol].values.T, asol, sol_vis, sol_nir, sol_sw
+        )
+        _, _, snow.rs3[iind_pol] = BBA_calc_pol(
+            snow.alb_sph[iind_pol].values.T, asol, sol_vis, sol_nir, sol_sw
+        )
     msk = OLCI_scene.toa.sel(band=0) < thv0
     snow["rp3"] = xr.where(msk, snow["rp3"] * snow.factor, snow["rp3"])
     # rvis = xr.where(msk, rvis*snow.factor, rvis)
@@ -584,23 +606,10 @@ def compute_BBA(OLCI_scene, snow, angles, compute_polluted=True):
     snow["rs3"] = xr.where(msk, snow["rs3"] * snow.factor, snow["rs3"])
     # rviss = xr.where(msk, rviss*snow.factor, rviss)
     # rnirs = xr.where(msk, rnirs*snow.factor, rnirs)
-
-    if compute_polluted:
-        # calculation of the BBA for the polluted snow
-        ind_pol = (snow.isnow == 2) | (snow.isnow == 3)
-        iind_pol = dict(xy=np.arange(len(ind_pol))[ind_pol])
-
-        # rp1[iind_pol], rp2[iind_pol], rp3[iind_pol] = BBA_calc_pol(rp[iind_pol], asol, sol1, sol2, sol3)
-        # rs1[iind_pol], rs2[iind_pol], rs3[iind_pol] = BBA_calc_pol(alb_sph[iind_pol], asol, sol1, sol2, sol3)
-        _, _, snow.rp3[iind_pol] = BBA_calc_pol(
-            snow.rp[iind_pol].values.T, asol, sol1, sol2, sol3
-        )
-        _, _, snow.rs3[iind_pol] = BBA_calc_pol(
-            snow.alb_sph[iind_pol].values.T, asol, sol1, sol2, sol3
-        )
-        return snow
+    return snow
 
 
+@numba.jit(nopython=True)
 def funp(x, al, sph_calc, u1):
     #     Spectral planar albedo
     # Original way to recalculate the spectral albedo from al, u1 and the
@@ -616,8 +625,7 @@ def funp(x, al, sph_calc, u1):
     # xa(168),ya(168)       imaginary part (ya) of the refraction index at specified wavelength (xa)
     #
     # Outputs:
-    # f1*funcs              ?
-    #
+    # f1*solar_flux
     # bav 2020
     # using numpy interpolation
 
@@ -629,19 +637,18 @@ def funp(x, al, sph_calc, u1):
     else:
         rsd = 1.0
 
+    rs = rsd
     if sph_calc == 0:
         rs = rsd ** u1
-    elif sph_calc == 1:
-        rs = rsd
 
     if x < 0.4:
         x = 0.4
-    funcs = f0 + f1 * np.exp(-x * bet) + f2 * np.exp(-x * gam)
+    solar_flux = f0 + f1 * np.exp(-x * bet) + f2 * np.exp(-x * gam)
 
-    return rs * funcs
+    return rs * solar_flux
 
 
-def BBA_calc_clean(al, u1):
+def BBA_calc_clean(al, u1, mode='spherical'):
     # CalCULATION OF BBA of clean snow
     # Original method: Recalculating spectrum and integrating it.
     # This is the exact, but slow mehtod to calculate clean snow BBA.
@@ -651,38 +658,29 @@ def BBA_calc_clean(al, u1):
     # integrated uing the qsimp method.
     # Currently not used. But do not remove.
 
-    # for clean snow
-    # plane albedo
-    sph_calc = 0  # planar
-    # visible(0.3-0.7micron)
-
-    def func_integ(x):
-        return funp(x, al, sph_calc, u1)
-
-    p1 = qsimp(func_integ, 0.3, 0.7)
-
-    # near-infrared (0.7-2.4micron)
-    #        p2 = trapzd(func_integ,0.7,2.4, 20)
-    p2 = qsimp(func_integ, 0.7, 2.4)
-
-    # spherical albedo
-    sph_calc = 1  # spherical calculation
+    if mode == 'spherical':
+        sph_calc = 1   # spherical BBA
+    elif mode == 'planar':
+        sph_calc = 0  # planar BBA
 
     def func_integ(x):
         return funp(x, al, sph_calc, u1)
 
     # visible(0.3-0.7micron)
     #        s1 = trapzd(func_integ,0.3,0.7, 20)
-    s1 = qsimp(func_integ, 0.3, 0.7)
+    flux_vis = qsimp(func_integ, 0.3, 0.7)
+
     # near-infrared (0.7-2.4micron)
     #        s2 = trapzd(func_integ,0.7,2.4, 20)
-    s2 = qsimp(func_integ, 0.7, 2.4)
+    flux_nir = qsimp(func_integ, 0.7, 2.4)
     # shortwave(0.3-2.4 micron)
-    # END of clean snow bba calculation
-    return p1, p2, s1, s2
+    bba_vis = flux_vis/sol_vis
+    bba_nir = flux_nir/sol_nir
+    bba_sw = (flux_vis + flux_nir)/sol_sw
+    return bba_vis, bba_nir, bba_sw
 
 
-@numba.jit(nopython=True)
+# @numba.jit(nopython=True)
 def qsimp(func, a, b):
     # integrate function between a and b using simpson's method.
     # works as fast as scipy.integrate quad
@@ -715,7 +713,7 @@ def qsimp(func, a, b):
     return s
 
 
-def BBA_calc_pol(alb, asol, sol1_pol, sol2, sol3_pol):
+def BBA_calc_pol(alb, asol, sol_vis, sol_nir, sol_sw):
     # polluted snow
     # NEW CODE FOR BBA OF BARE ICE
     # alb is either the planar or spherical albedo
@@ -751,7 +749,7 @@ def BBA_calc_pol(alb, asol, sol1_pol, sol2, sol3_pol):
     # QUADRATIC POLYNOMIal for the range 400-709nm
     _, a1, b1, c1 = quad_func(alam2, alam3, alam5, r2, r3, r5)
     coef1, coef2 = analyt_func(0.3, 0.7)
-    ajx1 = a1 * sol1
+    ajx1 = a1 * sol_vis
     ajx2 = b1 * coef1
     ajx3 = c1 * coef2
 
@@ -778,9 +776,9 @@ def BBA_calc_pol(alb, asol, sol1_pol, sol2, sol3_pol):
     aj33 = (1.0 / (gam + an)) * (np.exp(-(gam + an) * z2) - np.exp(-(an + gam) * z1))
     aj3 = (-f0 * aj31 - f1 * aj32 - f2 * aj33) * p
 
-    BBA_vis = aj1 / sol1_pol
-    BBA_nir = (aj2 + aj3) / sol2  # here segment 2.1 and 2.2 are summed
-    BBA_sw = (aj1 + aj2 + aj3) / sol3_pol
+    BBA_vis = aj1 / sol_vis
+    BBA_nir = (aj2 + aj3) / sol_nir  # here segment 2.1 and 2.2 are summed
+    BBA_sw = (aj1 + aj2 + aj3) / sol_sw
 
     return BBA_vis, BBA_nir, BBA_sw
 
