@@ -17,6 +17,7 @@ import sys
 #import bav_lib as bl
 import pandas as pd
 import rioxarray
+import xarray as xr
 import shutil
 import glob
 import subprocess
@@ -27,6 +28,14 @@ ProcessingFolder = './fortran/'
 start_time = time.time()
 InputFolder = InputFolder + "/"
 Oa01 = rio.open(InputFolder + "r_TOA_01.tif")
+band1 = Oa01.read(1)
+height = band1.shape[0]
+width = band1.shape[1]
+cols, rows = np.meshgrid(np.arange(width), np.arange(height))
+xs, ys = rio.transform.xy(Oa01.transform, rows, cols)
+lons= np.array(xs)
+lats = np.array(ys)
+print('lons shape', lons.shape)
 meta = Oa01.meta
 
 def WriteOutput(var, var_name, in_folder):
@@ -56,10 +65,10 @@ vaa[np.isnan(toa[0, :, :])] = np.nan
 
 olci_toa = np.vstack(
     (
-        np.arange(1, len(sza.flatten()) + 1),  # pixel number_x
-        np.arange(1, len(sza.flatten()) + 1),  # pixel number_y
-        np.arange(1, len(sza.flatten()) + 1),  # latitude
-        np.arange(1, len(sza.flatten()) + 1),  # longitude
+        cols.flatten(),  # pixel number_x
+        rows.flatten(),  # pixel number_y
+        lats.flatten(),  # latitude
+        lons.flatten(),  # longitude
         sza.flatten(),  # solar zenith angle
         saa.flatten(),  # soalr azimuthal angle
         vza.flatten(),  # viewing zenith angle
