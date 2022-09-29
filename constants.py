@@ -92,16 +92,6 @@ ya = np.array(
     ]
 )
 
-df = pd.read_csv('refice.dat', sep=' ',header=None)
-xa_new = df.iloc[:,0]/1000
-ya_new = df.iloc[:,1]
-
-ya = ya[xa>xa_new.max()]
-xa = xa[xa>xa_new.max()]
-
-xa= np.append(xa_new.values, xa)
-ya= np.append(ya_new.values, ya)
-
 # OLCI channels
 wls = xr.DataArray(
     [
