@@ -14,11 +14,7 @@ import xarray as xr
 import netCDF4
 import numpy as np
 import rioxarray
-
-try:
-    import rasterio as rio
-except ImportError:
-    rio = None  # make rasterio optional at this stage
+import rasterio as rio
 
 
 class sice_io(object):
@@ -337,15 +333,21 @@ def write_output(snow, OutputFolder):
         "rs3": "albedo_bb_spherical_sw",
         "factor": "factor",
     }
+    
+    def da_to_tif(da, file_path):
+        da = da.unstack(dim="xy").transpose("y", "x")
+        da.reindex(y=list(reversed(da.y))).rio.to_raster(file_path,
+            dtype='float32',compress='DEFLATE')
+        
     print('Printing out:')
     for var in ["diameter", "area", "rp3", "rs3", "isnow", "r0", "al", 'factor']:
         print(var)
-        snow[var].unstack(dim="xy").transpose("y", "x").rio.to_raster(
-            os.path.join(OutputFolder, file_name_list[var] + ".tif")
-        )
-    snow.alb_sph.sel(band=0).unstack(dim="xy").transpose("y", "x").rio.to_raster(OutputFolder+'/alb_sph_01_solved.tif')
-    snow.alb_sph_direct.sel(band=0).unstack(dim="xy").transpose("y", "x").rio.to_raster(OutputFolder+'/alb_sph_01.tif')
-    snow.rp.sel(band=0).unstack(dim="xy").transpose("y", "x").rio.to_raster(OutputFolder+'/alb_pl_01_solved.tif')
-    snow.rp_direct.sel(band=0).unstack(dim="xy").transpose("y", "x").rio.to_raster(OutputFolder+'/alb_pl_01.tif')
+        da_to_tif(snow[var],
+                  os.path.join(OutputFolder, file_name_list[var] + ".tif"))
+        
+    da_to_tif(snow.alb_sph.sel(band=0), OutputFolder+'/alb_sph_01_solved.tif')
+    da_to_tif(snow.alb_sph_direct.sel(band=0), OutputFolder+'/alb_sph_01.tif')
+    da_to_tif(snow.rp.sel(band=0), OutputFolder+'/alb_pl_01_solved.tif')
+    da_to_tif(snow.rp_direct.sel(band=0), OutputFolder+'/alb_pl_01.tif')
     # for var in ['BXXX', ]:
     #     var = OLCI_scene[var].unstack(dim='xy').transpose('y', 'x').rio.to_raster(os.path.join(OutputFolder, file_name_list[var] + '.tif'))

@@ -121,32 +121,6 @@ wls = xr.DataArray(
 )
 
 # Imaginary part of ice refrative index at OLCI channels
-bai_old = xr.DataArray(
-    [
-        2.365e-11,
-        2.7e-11,
-        7.0e-11,
-        4.17e-10,
-        8.04e-10,
-        2.84e-09,
-        8.58e-09,
-        1.78e-08,
-        1.95e-08,
-        2.1e-08,
-        3.3e-08,
-        6.23e-08,
-        7.1e-08,
-        7.68e-08,
-        8.13e-08,
-        9.88e-08,
-        2.4e-07,
-        3.64e-07,
-        4.2e-07,
-        5.53e-07,
-        2.25e-06,
-    ],
-    coords=[bandcoord],
-)
 bai = xr.DataArray(
     [
         6.27E-10,
@@ -198,7 +172,7 @@ anna = 1.3
 molec = 0
 jend = 100  # number of pixels to be printed (with spectral data)
 # patchy snow threshold for the channel R(400nm)
-thv0 = 0.74
+thv0 = 0.5
 # threshold for the measured and simulated spectra differences
 thv1 = 10.0
 # threshold for the grain diameter
@@ -212,18 +186,18 @@ thv3 = 1000.0
 f0 = 32.38
 f1 = -160140.33
 f2 = 7959.53
-bet = 1.0 / 0.08534
-gam = 1.0 / 0.40179
+bet = 11.72  # 1.0 / 0.08534
+gam = 2.49   # 1.0 / 0.40179
 
 
 def sol(x):
-    # SOLAR SPECTRUM at GROUND level
+    # antiderivative of the SOLAR SPECTRUM at GROUND level
     # Inputs:
     # x         wave length in micrometer
     # Outputs:
     # sol       solar spectrum in W m-2 micrometer-1 (?)
-    #    if (x < 0.4):
-    #            x=0.4
+    # if (x < 0.4):
+    #         x=0.4
     sol1a = f0 * x
     sol1b = -f1 * np.exp(-bet * x) / bet
     sol1c = -f2 * np.exp(-gam * x) / gam

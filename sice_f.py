@@ -21,6 +21,7 @@ import xarray as xr
 import shutil
 import glob
 import subprocess
+import geopandas as gpd
 InputFolder = './data/5_km_res/'
 OutputFolder = './data/5_km_res/fortran/'
 ProcessingFolder = './fortran/'
@@ -33,8 +34,20 @@ height = band1.shape[0]
 width = band1.shape[1]
 cols, rows = np.meshgrid(np.arange(width), np.arange(height))
 xs, ys = rio.transform.xy(Oa01.transform, rows, cols)
-lons= np.array(xs)
-lats = np.array(ys)
+x= np.array(xs)
+y = np.array(ys)
+coords = gpd.GeoDataFrame()
+coords['x'] = x.flatten()
+coords['y'] = y.flatten()
+coords['Oa01'] = band1.flatten()
+coords['lat'] = np.nan
+coords['lon'] = np.nan
+coords_small = coords.loc[coords.Oa01.notnull(),:].copy()
+coords_small['geometry'] = gpd.points_from_xy(coords_small.x, coords_small.y)
+coords_small = coords_small.set_crs('epsg:3413')
+coords_small = coords_small.to_crs('epsg:4326')
+coords.loc[coords.Oa01.notnull(),'lon'] = coords_small.geometry.x.values
+coords.loc[coords.Oa01.notnull(),'lat'] = coords_small.geometry.y.values
 print('lons shape', lons.shape)
 meta = Oa01.meta
 
@@ -67,8 +80,8 @@ olci_toa = np.vstack(
     (
         cols.flatten(),  # pixel number_x
         rows.flatten(),  # pixel number_y
-        lats.flatten(),  # latitude
-        lons.flatten(),  # longitude
+        coords.lon.values,  # longitude
+        coords.lat.values,  # latitude
         sza.flatten(),  # solar zenith angle
         saa.flatten(),  # soalr azimuthal angle
         vza.flatten(),  # viewing zenith angle

@@ -555,33 +555,32 @@ def compute_BBA(OLCI_scene, snow, angles, compute_polluted=True):
     # rp3[ind_all_clean]=(p1+p2)/sol_sw
     # rs3[ind_all_clean]=(s1+s2)/sol_sw
 
-    # approximation
     # 2022 exact:
-    snow['rp3'] = snow['al']*np.nan
-    snow['rs3'] = snow['al']*np.nan
+    # snow['rp3'] = snow['al']*np.nan
+    # snow['rs3'] = snow['al']*np.nan
     
-    ind_clean = (snow.isnow == 1) 
-    iind_clean = np.arange(len(ind_clean))[ind_clean]
-    from progressbar import progressbar
-    for i in progressbar(iind_clean):
-        if np.isnan(snow.al[{'xy':i}]):
-            continue
+    # ind_clean = (snow.isnow == 1) 
+    # iind_clean = np.arange(len(ind_clean))[ind_clean]
+    # from progressbar import progressbar
+    # for i in progressbar(iind_clean):
+    #     if np.isnan(snow.al[{'xy':i}]):
+    #         continue
 
-        _, _, snow.rp3[{'xy':i}] = BBA_calc_clean(float(snow.al[{'xy':i}].values),
-                                                  float(angles.u1[{'xy':i}].values), mode='planar')
-        _, _, snow.rs3[{'xy':i}] = BBA_calc_clean(snow.al[{'xy':i}].values,
-                                                  angles.u1[{'xy':i}].values, mode='spherical')
+    #     _, _, snow.rp3[{'xy':i}] = BBA_calc_clean(float(snow.al[{'xy':i}].values),
+    #                                               float(angles.u1[{'xy':i}].values), mode='planar')
+    #     _, _, snow.rs3[{'xy':i}] = BBA_calc_clean(snow.al[{'xy':i}].values,
+    #                                               angles.u1[{'xy':i}].values, mode='spherical')
 
     # 2022 approximation:
     # planar albedo
     # rp1 and rp2 not derived anymore
-    # snow["rp3"] = 0.5271 + 0.3612 * np.exp(-angles.u1 * np.sqrt(0.02350 * snow.al))
+    snow["rp3"] = 0.5271 + 0.3612 * np.exp(-angles.u1 * np.sqrt(0.02350 * snow.al))
     # rvis = np.exp(-angles.u1*np.sqrt (7.86e-5*snow.al))
     # rnir = 0.2335+0.56*np.exp(-angles.u1*np.sqrt(0.0327*snow.al))
 
     # spherical albedo
     # rs1 and rs2 not derived anymore
-    # snow["rs3"] = 0.5271 + 0.3612 * np.exp(-np.sqrt(0.02350 * snow.al))
+    snow["rs3"] = 0.5271 + 0.3612 * np.exp(-np.sqrt(0.02350 * snow.al))
     # rviss = np.exp(-np.sqrt (7.86e-5*snow.al))
     # rnirs = 0.2335+0.56*np.exp(-np.sqrt(0.0327*snow.al))
 
@@ -641,10 +640,9 @@ def funp(x, al, sph_calc, u1):
     if sph_calc == 0:
         rs = rsd ** u1
 
-    if x < 0.4:
-        x = 0.4
+    # if x < 0.4:
+    #     x = 0.4
     solar_flux = f0 + f1 * np.exp(-x * bet) + f2 * np.exp(-x * gam)
-
     return rs * solar_flux
 
 
@@ -667,12 +665,11 @@ def BBA_calc_clean(al, u1, mode='spherical'):
         return funp(x, al, sph_calc, u1)
 
     # visible(0.3-0.7micron)
-    #        s1 = trapzd(func_integ,0.3,0.7, 20)
     flux_vis = qsimp(func_integ, 0.3, 0.7)
 
     # near-infrared (0.7-2.4micron)
-    #        s2 = trapzd(func_integ,0.7,2.4, 20)
     flux_nir = qsimp(func_integ, 0.7, 2.4)
+    
     # shortwave(0.3-2.4 micron)
     bba_vis = flux_vis/sol_vis
     bba_nir = flux_nir/sol_nir
