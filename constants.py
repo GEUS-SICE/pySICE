@@ -207,7 +207,7 @@ def sol(x):
 # solar flux calculation
 # sol1      visible(0.3-0.7micron)
 # Update 2022: same for clean and polluted
-sol_vis = sol(0.7) - sol(0.3)
+sol_vis = sol(0.7) - sol(0.33)
 # sol2      near-infrared (0.7-2.4micron)
 # Update 2022: same for clean and polluted
 sol_nir = sol(2.4) - sol(0.7)

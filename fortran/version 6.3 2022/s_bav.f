@@ -719,8 +719,7 @@ c     QUADRATIC POLYNOMIAL for the range 709-865nm
                            a2=x1*x2*y0/d1+x0*x2*y1/d2+x0*x1*y2/d3
                            b2=-(x1+x2)*y0/d1-(x0+x2)*y1/d2-(x0+x1)*y2/d3
                            c2=y0/d1+y1/d2+y2/d3
-                           x=x1
-                           sa1=a2+b2*x+c2*x*x
+
 c     QUADRATIC POLYNOMIAL for the range 400-709nm
       x0=alam2; x1=alam3; x2=alam5
       y0=r2; y1=r3; y2=r5
@@ -730,8 +729,7 @@ c     QUADRATIC POLYNOMIAL for the range 400-709nm
                            a1=x1*x2*y0/d1+x0*x2*y1/d2+x0*x1*y2/d3
                            b1=-(x1+x2)*y0/d1-(x0+x2)*y1/d2-(x0+x1)*y2/d3
                            c1=y0/d1+y1/d2+y2/d3
-                           x=x1
-                           sa1=a1+b1*x+c1*x*x
+
 c     exponential approximation for the range above 0.865nm
                            x0=    alam7
                            x1=    alam8
@@ -739,8 +737,7 @@ c     exponential approximation for the range above 0.865nm
                            alasta=(x1-x0)/alog(rati)
                            an=1./alasta
                            p=r7*exp(x0/alasta)
-                           x=alam8
-                           sa1=p*exp(-x/alasta)
+
 c     END of approximations for 3 intervals
 
 c     approximation for the solar flux
@@ -779,7 +776,6 @@ c     integration over 3 segments
 c     segment 1                     
                      z1=0.3; z2=0.7
                      ajx1=a1*sol1
-
                      ak1=(z2**2.-z1**2.)/2.
                      ak2=(z2/bet+1./bet/bet)*exp(-bet*z2)-
      c                    (z1/bet+1./bet/bet)*exp(-bet*z1)

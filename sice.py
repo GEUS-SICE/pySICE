@@ -61,14 +61,14 @@
 # r0                        reflectance of a semi-infinite non-absorbing snow layer
 #
 # plane BroadBand Albedo (BBA)
-# rp1                       visible(0.3-0.7micron)
+# rp1                       visible(0.33-0.7micron)
 # rp2                       near-infrared (0.7-2.4micron)
-# rp3                       shortwave(0.3-2.4 micron)shortwave(0.3-2.4 micron)
+# rp3                       shortwave(0.33-2.4 micron)shortwave(0.33-2.4 micron)
 #
 # spherical BBA
-# rs1                       visible(0.3-0.7micron)
+# rs1                       visible(0.33-0.7micron)
 # rs2                       near-infrared (0.7-2.4micron)
-# rs3                       shortwave(0.3-2.4 micron)shortwave(0.3-2.4 micron)
+# rs3                       shortwave(0.33-2.4 micron)shortwave(0.33-2.4 micron)
 #
 # Ozone retrieval:
 # BXXX                      retrieved total ozone from OLCI measurements
@@ -286,21 +286,21 @@ def aerosol_properties(height, cos_sa, aot=0.07):
 
 
 def prepare_coef(aerosol, angles):
-    args = (
-        aerosol.tau,
-        aerosol.g,
-        aerosol.p,
-        angles.cos_sza,
-        angles.cos_vza,
-        angles.inv_cos_za,
-        aerosol.gaer,
-        aerosol.taumol,
-        aerosol.tauaer,
-    )
+    # args = (
+    #     aerosol.tau,
+    #     aerosol.g,
+    #     aerosol.p,
+    #     angles.cos_sza,
+    #     angles.cos_vza,
+    #     angles.inv_cos_za,
+    #     aerosol.gaer,
+    #     aerosol.taumol,
+    #     aerosol.tauaer,
+    # )
     # inputdims = tuple([d.dims for d in args])
     # outputdims = [aerosol.p.dims, aerosol.tau.dims, aerosol.p.dims]
     # t1t2, albatm, r = xr.apply_ufunc(prepare_coef_numpy, *args, input_core_dims=inputdims, output_core_dims=outputdims)
-    t1t2, albatm, r = prepare_coef_numpy(
+    t1t2, albatm, r = prepare_coef_xarray(
         aerosol.tau,
         aerosol.g,
         aerosol.p,
@@ -320,7 +320,7 @@ def prepare_coef(aerosol, angles):
 
 
 # @numba.jit(nopython=True, cache=True)
-def prepare_coef_numpy(tau, g, p, cos_sza, cos_vza, inv_cos_za, gaer, taumol, tauaer):
+def prepare_coef_xarray(tau, g, p, cos_sza, cos_vza, inv_cos_za, gaer, taumol, tauaer):
     # atmospheric reflectance
     b1 = 1.0 + 1.5 * cos_sza + (1.0 - 1.5 * cos_sza) * np.exp(-tau / cos_sza)
     b2 = 1.0 + 1.5 * cos_vza + (1.0 - 1.5 * cos_vza) * np.exp(-tau / cos_vza)
@@ -509,7 +509,6 @@ def snow_impurities(snow):
     aload_ppm = xr.where(bm > 10, 0, aload_ppm)
     bm = xr.where(bm < 0.9, 0, bm)
 
-
     impurities = xr.Dataset()
     impurities["ntype"] = ntype.where(ind_nonan)
     impurities["polut"] = polut.where(ind_nonan)
@@ -545,13 +544,13 @@ def compute_BBA(OLCI_scene, snow, angles, compute_polluted=True):
     # BBA_v = np.vectorize(BBA_calc_clean)
     # p1,p2,s1,s2 = BBA_v(al[ind_all_clean], u1[ind_all_clean])
     #
-    # visible(0.3-0.7micron)
+    # visible(0.33-0.7micron)
     # rp1[ind_all_clean]=p1/sol_vis
     # rs1[ind_all_clean]=s1/sol_vis
     # near-infrared (0.7-2.4micron)
     # rp2[ind_all_clean]=p2/sol_nir
     # rs2[ind_all_clean]=s2/sol_nir
-    # shortwave(0.3-2.4 micron)
+    # shortwave(0.33-2.4 micron)
     # rp3[ind_all_clean]=(p1+p2)/sol_sw
     # rs3[ind_all_clean]=(s1+s2)/sol_sw
 
@@ -561,8 +560,7 @@ def compute_BBA(OLCI_scene, snow, angles, compute_polluted=True):
     
     # ind_clean = (snow.isnow == 1) 
     # iind_clean = np.arange(len(ind_clean))[ind_clean]
-    # from progressbar import progressbar
-    # for i in progressbar(iind_clean):
+    # for i in iind_clean:
     #     if np.isnan(snow.al[{'xy':i}]):
     #         continue
 
@@ -640,9 +638,10 @@ def funp(x, al, sph_calc, u1):
     if sph_calc == 0:
         rs = rsd ** u1
 
-    # if x < 0.4:
-    #     x = 0.4
-    solar_flux = f0 + f1 * np.exp(-x * bet) + f2 * np.exp(-x * gam)
+    if x < 0.33:
+        solar_flux = 0
+    else:
+        solar_flux = f0 + f1 * np.exp(-x * bet) + f2 * np.exp(-x * gam)
     return rs * solar_flux
 
 
@@ -664,8 +663,8 @@ def BBA_calc_clean(al, u1, mode='spherical'):
     def func_integ(x):
         return funp(x, al, sph_calc, u1)
 
-    # visible(0.3-0.7micron)
-    flux_vis = qsimp(func_integ, 0.3, 0.7)
+    # visible(0.33-0.7micron)
+    flux_vis = qsimp(func_integ, 0.33, 0.7)
 
     # near-infrared (0.7-2.4micron)
     flux_nir = qsimp(func_integ, 0.7, 2.4)
@@ -677,7 +676,7 @@ def BBA_calc_clean(al, u1, mode='spherical'):
     return bba_vis, bba_nir, bba_sw
 
 
-# @numba.jit(nopython=True)
+# @numba.jit(nopython=False)
 def qsimp(func, a, b):
     # integrate function between a and b using simpson's method.
     # works as fast as scipy.integrate quad
@@ -710,6 +709,7 @@ def qsimp(func, a, b):
     return s
 
 
+@numba.jit(nopython=True, cache=True)
 def BBA_calc_pol(alb, asol, sol_vis, sol_nir, sol_sw):
     # polluted snow
     # NEW CODE FOR BBA OF BARE ICE
@@ -744,8 +744,9 @@ def BBA_calc_pol(alb, asol, sol_vis, sol_nir, sol_sw):
     r8 = alb[20, :]
 
     # QUADRATIC POLYNOMIal for the range 400-709nm
+    # on this section r_fit(lambda) = a1 + b1 * lambda + c1 * lambda**2
     _, a1, b1, c1 = quad_func(alam2, alam3, alam5, r2, r3, r5)
-    coef1, coef2 = analyt_func(0.3, 0.7)
+    coef1, coef2 = analyt_func(0.33, 0.7)
     ajx1 = a1 * sol_vis
     ajx2 = b1 * coef1
     ajx3 = c1 * coef2
@@ -753,6 +754,7 @@ def BBA_calc_pol(alb, asol, sol_vis, sol_nir, sol_sw):
     aj1 = ajx1 + ajx2 + ajx3
 
     # QUADRATIC POLYNOMIal for the range 709-865nm
+    # on this section r_fit(lambda) = a2 + b2 * lambda + c2 * lambda**2
     _, a2, b2, c2 = quad_func(alam5, alam6, alam7, r5, r6, r7)
     coef3, coef4 = analyt_func(0.7, 0.865)
     ajx1 = a2 * asol
@@ -761,6 +763,7 @@ def BBA_calc_pol(alb, asol, sol_vis, sol_nir, sol_sw):
     aj2 = ajx1 + ajx2 + ajx3
 
     # exponential approximation for the range 865- 2400 nm
+    # on this section r_fit(lambda) = p * exp(-an * lambda)
     rati = r7 / r8
     alasta = (alam8 - alam7) / np.log(rati)
     an = 1.0 / alasta
@@ -779,29 +782,30 @@ def BBA_calc_pol(alb, asol, sol_vis, sol_nir, sol_sw):
 
     return BBA_vis, BBA_nir, BBA_sw
 
+@numba.jit(nopython=True, cache=True)
 def analyt_func(z1, z2):
     # analystical integration of the solar flux
     # see BBA_calc_pol
     # compatible with array
-    ak1 = (z2 ** 2.0 - z1 ** 2.0) / 2.0
-    ak2 = (z2 / bet + 1.0 / bet ** 2) * np.exp(-bet * z2) - (
-        z1 / bet + 1.0 / bet ** 2
+    ak1 = (z2 ** 2 - z1 ** 2) / 2
+    ak2 = (z2 / bet + 1 / bet ** 2) * np.exp(-bet * z2) - (
+        z1 / bet + 1 / bet ** 2
     ) * np.exp(-bet * z1)
-    ak3 = (z2 / gam + 1.0 / gam ** 2) * np.exp(-gam * z2) - (
-        z1 / gam + 1.0 / gam ** 2
+    ak3 = (z2 / gam + 1 / gam ** 2) * np.exp(-gam * z2) - (
+        z1 / gam + 1 / gam ** 2
     ) * np.exp(-gam * z1)
 
-    am1 = (z2 ** 3.0 - z1 ** 3.0) / 3.0
-    am2 = (z2 ** 2.0 / bet + 2.0 * z2 / bet ** 2 + 2.0 / bet ** 3) * np.exp(
+    am1 = (z2 ** 3 - z1 ** 3) / 3
+    am2 = (z2 ** 2 / bet + 2 * z2 / bet ** 2 + 2 / bet ** 3) * np.exp(
         -bet * z2
-    ) - (z1 ** 2.0 / bet + 2.0 * z1 / bet ** 2 + 2.0 / bet ** 3) * np.exp(-bet * z1)
-    am3 = (z2 ** 2.0 / gam + 2.0 * z2 / gam ** 2 + 2.0 / gam ** 3.0) * np.exp(
+    ) - (z1 ** 2 / bet + 2 * z1 / bet ** 2 + 2 / bet ** 3) * np.exp(-bet * z1)
+    am3 = (z2 ** 2 / gam + 2 * z2 / gam ** 2 + 2 / gam ** 3) * np.exp(
         -gam * z2
-    ) - (z1 ** 2.0 / gam + 2.0 * z1 / gam ** 2 + 2.0 / gam ** 3.0) * np.exp(-gam * z1)
+    ) - (z1 ** 2 / gam + 2 * z1 / gam ** 2 + 2 / gam ** 3) * np.exp(-gam * z1)
 
     return (f0 * ak1 - f1 * ak2 - f2 * ak3), (f0 * am1 - f1 * am2 - f2 * am3)
 
-
+@numba.jit(nopython=True, cache=True)
 def quad_func(x0, x1, x2, y0, y1, y2):
     # quadratic function used for the polluted snow BBA calculation
     # see BBA_calc_pol

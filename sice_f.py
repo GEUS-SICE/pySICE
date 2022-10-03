@@ -48,7 +48,7 @@ coords_small = coords_small.set_crs('epsg:3413')
 coords_small = coords_small.to_crs('epsg:4326')
 coords.loc[coords.Oa01.notnull(),'lon'] = coords_small.geometry.x.values
 coords.loc[coords.Oa01.notnull(),'lat'] = coords_small.geometry.y.values
-print('lons shape', lons.shape)
+
 meta = Oa01.meta
 
 def WriteOutput(var, var_name, in_folder):
@@ -117,8 +117,6 @@ subprocess.check_call('./sice.exe')
 for file in glob.glob(r'*.dat'):
     if file == 'thv.dat':
         continue
-    if file == 'input.dat':
-        continue
     
     print('Moving '+file)
     shutil.move(file, '../'+OutputFolder+'/'+file)
@@ -127,17 +125,19 @@ os.chdir('..')
 
 #%% Converting text output to geotiff
 Oa01 = rio.open(InputFolder + "r_TOA_01.tif")
+input_file = pd.read_csv(OutputFolder + "input.dat", delim_whitespace=True, header=None).values
+
 meta = Oa01.meta
 with rio.Env():
     meta.update(compress="DEFLATE")
 
 def output_sice_f(file_name, var_name, var_id):
     sice_out = pd.read_csv(file_name, delim_whitespace=True, header=None).values
-    ind_orig = np.arange(1, len(Oa01.read(1).flatten()) + 1)
-    var = ind_orig * np.nan
-    ind_pix = sice_out[:, 1].astype(int)
-    var[ind_pix - 1] = sice_out[:, var_id]
-    var_mat = np.reshape(var, np.shape(Oa01.read(1)))
+    ind_pix = sice_out[:,0].astype(int)
+    i = input_file[ind_pix - 1, 1].astype(int)
+    j = input_file[ind_pix - 1, 0].astype(int)
+    var_mat = Oa01.read(1)*np.nan
+    var_mat[i,j] = sice_out[:, var_id]
     var_mat[var_mat == 999] = np.nan
     with rio.open(OutputFolder + var_name + ".tif", "w+", **meta) as dst:
         dst.write(var_mat.astype("float32"), 1)
@@ -221,8 +221,8 @@ import numpy as np
 #code_ver1 = 'pySICEv1.6'
 #code_ver2 = 'pySICEv2.0'
 data_folder = 'data/5_km_res/'
-code_ver1 = 'fortran'
-code_ver2 = 'pySICEv2.0_int'
+code_ver1 = 'pySICEv2.0'
+code_ver2 = 'fortran'
 folder1 = data_folder+code_ver1+'/'
 folder2 =  data_folder+code_ver2+'/'
 var_list = ['isnow', "grain_diameter", "snow_specific_area",   
@@ -244,7 +244,7 @@ for var in var_list:
     vmax = max(ds_f.max(), ds_p.max())
     
     if var == 'isnow':
-        if 'pySICE' in code_ver1:
+        if 'v1.6' in code_ver2:
             ds_f = ds_f.where(ds_f>=0).where(ds_f<10)+1
         ds_f=ds_f.rename('isnow')
         isnow = ds_p.copy()
@@ -278,7 +278,7 @@ for var in var_list:
     ax[3].plot(ds_f.where(isnow==3).values.flatten(),
                ds_p.where(isnow==3).values.flatten(),
                marker ='.', linestyle='None', label='mixed pixels')
-    ax[3].legend(title='pixel class in '+code_ver2,loc='upper right')
+    ax[3].legend(title='pixel class in '+code_ver2)  #,loc='upper right')
     ax[3].plot([ds_f.min(), ds_f.max()], [ds_f.min(), ds_f.max()],color='k')
     ax[3].set_xlabel(code_ver1)
     ax[3].set_ylabel(code_ver2)
@@ -290,26 +290,26 @@ for var in var_list:
         ax[i].set_ylabel('')
     
 
-    fig, ax = plt.subplots(1,1, figsize=(15,15))
-    ax.plot(np.arange(len(ds_p.values.flatten())),
-               100*(-ds_f.where(isnow==1).values.flatten() + ds_p.where(isnow==1).values.flatten())/ds_f.where(isnow==1).values.flatten(),
-               marker ='.', linestyle='None', label='clean pixels')
-    ax.plot(np.arange(len(ds_p.values.flatten())),
-               100*(-ds_f.where(isnow==2).values.flatten() + ds_p.where(isnow==2).values.flatten())/ds_f.where(isnow==2).values.flatten(),
-               marker ='.', linestyle='None', label='polluted pixels')
-    ax.plot(np.arange(len(ds_p.values.flatten())),
-               100*(-ds_f.where(isnow==3).values.flatten() + ds_p.where(isnow==3).values.flatten())/ds_f.where(isnow==3).values.flatten(),
-               marker ='.', linestyle='None', label='mixed pixels')
-    ax.plot(np.arange(len(ds_p.values.flatten()))[ds_p.notnull().values.flatten()],
-            np.arange(len(ds_p.values.flatten()))[ds_p.notnull().values.flatten()]*0, 'k', linestyle='--')        
-    ax.plot(np.arange(len(ds_p.values.flatten()))[ds_p.notnull().values.flatten()],
-            np.arange(len(ds_p.values.flatten()))[ds_p.notnull().values.flatten()]*0+((ds_p-ds_f)/ds_f*100).mean().values, 'k', linestyle='--')
-    ax.legend(title='pixel class in '+code_ver2,loc='upper right')
-    print(var, ((ds_p.where(isnow!=3)-ds_f.where(isnow!=3))/ds_f*100).mean().values)
-    ax.set_xlim(np.min(np.arange(len(ds_p.values.flatten()))[ds_p.notnull().values.flatten()]),
-                np.max(np.arange(len(ds_p.values.flatten()))[ds_p.notnull().values.flatten()]))
-    ax.set_ylabel(code_ver2+' - '+code_ver1)
-    ax.set_title(var)
+    # fig, ax = plt.subplots(1,1, figsize=(15,15))
+    # ax.plot(np.arange(len(ds_p.values.flatten())),
+    #            100*(-ds_f.where(isnow==1).values.flatten() + ds_p.where(isnow==1).values.flatten())/ds_f.where(isnow==1).values.flatten(),
+    #            marker ='.', linestyle='None', label='clean pixels')
+    # ax.plot(np.arange(len(ds_p.values.flatten())),
+    #            100*(-ds_f.where(isnow==2).values.flatten() + ds_p.where(isnow==2).values.flatten())/ds_f.where(isnow==2).values.flatten(),
+    #            marker ='.', linestyle='None', label='polluted pixels')
+    # ax.plot(np.arange(len(ds_p.values.flatten())),
+    #            100*(-ds_f.where(isnow==3).values.flatten() + ds_p.where(isnow==3).values.flatten())/ds_f.where(isnow==3).values.flatten(),
+    #            marker ='.', linestyle='None', label='mixed pixels')
+    # ax.plot(np.arange(len(ds_p.values.flatten()))[ds_p.notnull().values.flatten()],
+    #         np.arange(len(ds_p.values.flatten()))[ds_p.notnull().values.flatten()]*0, 'k', linestyle='--')        
+    # ax.plot(np.arange(len(ds_p.values.flatten()))[ds_p.notnull().values.flatten()],
+    #         np.arange(len(ds_p.values.flatten()))[ds_p.notnull().values.flatten()]*0+((ds_p-ds_f)/ds_f*100).mean().values, 'k', linestyle='--')
+    # ax.legend(title='pixel class in '+code_ver2,loc='upper right')
+    # print(var, ((ds_p.where(isnow!=3)-ds_f.where(isnow!=3))/ds_f*100).mean().values)
+    # ax.set_xlim(np.min(np.arange(len(ds_p.values.flatten()))[ds_p.notnull().values.flatten()]),
+    #             np.max(np.arange(len(ds_p.values.flatten()))[ds_p.notnull().values.flatten()]))
+    # ax.set_ylabel(code_ver2+' - '+code_ver1)
+    # ax.set_title(var)
 
         
     

@@ -1,0 +1,145 @@
+26.04.2022
+A. Kokhanovsky
+a.a.kokhanovsky@gmail.com
+
+The FORTRAN code s.f is aimed at the retrieval of snow properties from OLCI spectral reflectance data.
+
+The code is compiled as:
+gfortran -o sice.exe s.f
+
+The code is executed as:
+./sice.exe
+
+
+
+Input files
+------------
+
+1) thv.dat
+0.07 1.3 0 10 0.4 10. 0.07 1000. 2
+This file contains one line with the following assumed threshold values and parameters:
+-aerosol optical thickness (at 500nm),
+-the Angstrom exponent of atmopsheric aerosol,
+-index for the selection of molecular optical tickness calculation ( 0 or 1; adviced value: 1 ( this accounts for the underlying surface height)),
+-number of pixels for the output of spectral properties ( spectral spherical/plane albedo and bottom of atmosphere reflectance),
+THV0=threshold value for the reflectance at first OLCI channel below which not 100%  snow-covered pixels are assumed in the retrieval process
+THV1= threshold value (in percent) for the tolerated relative difference (in percent) of measured and simulated spectra (ratio: RMSD/average)
+THV2= threshold value for the smallest value of the retrieved grain diameter
+THV3= thereshold value for the difference of retrieved Total Ozone Column (TOC)  and ECMWF TOC (provided in OLCI files)
+the number of lines to be processed
+
+** It is adviced to use the following file for retrievals over Greenland:
+0.07 1.3 1 10 0.75 5. 0.07 25. 1000000
+
+
+2) input.dat
+This file contains multiple lines with the columns having the meaning given below
+The number of columns: 31
+
+  x,y,alon,alat,sza,saa,vza,vaa,(toa(ikss),ikss=1,21),height,ozon
+1           1  -36.4397621       75.8274231       57.7039833       166.162857       30.2590847       111.658005      0.985000014      0.983399987      0.980899990      0.966300011      0.942200005      0.882900000      0.866500020      0.903500021      0.909300029      0.912000000      0.886099994      0.896700025      0.266600013      0.464100003      0.796800017      0.870299995      0.840200007      0.810800016      0.620899975      0.292199999      0.641399980       2693.00000       5.96826803E-03
+           1           2   7.59637880       45.9349709       33.5887871       133.220978       29.4204731       101.433708      0.728999972      0.741500020      0.790499985      0.830600023      0.833899975      0.834800005      0.856500030      0.902199984      0.908900023      0.914200008      0.902899981      0.889100015      0.295300007      0.491699994      0.796100020      0.852299988      0.797100008      0.748099983      0.601800025      0.323599994      0.441100001       2442.00000       7.68266851E-03
+  
+
+
+
+
+x - coordinate(not used, it can be used to specify the date)
+y - coordinate(not used, it can be used to specify the time of measurements and orbit number)
+lon -longitude, deg
+lat -latitude, deg
+SZA - solar zenith angle, deg
+SAA - solar azimuthal angle, deg
+VZA - viewing zenith angle, deg
+VAA - viewing azimuthal angle, deg
+toa - TOA reeflectance at 21 channels
+height - height of the surface (m) as provided in OLCI files
+ozone-    ECMWF total ozone column as provided in OLCI files
+
+
+
+
+THE STRUCTURE OF OUTPUT FILES
+------------
+
+1) snow_parameters.dat
+This file contains multiple lines with retrieved snow parameters.
+The number of columns: 38
+  
+  1   75.8274231      -36.4397621               2   1.00000000      0.344947278       18.9702892       5.51915646      0.974586904       0.00000000       0.00000000       0.00000000       0.00000000       0.00000000       0.00000000       0.00000000      0.763169289      0.901263177      0.633621275      0.744890094      0.890791833      0.608017445      0.211264163      0.134179279      0.651167512               0           0           0   57.7039833       30.2590847       234.504852      0.985000014      0.641399980       260.523712       278.695679       6.97516775       11.4652729       5.03809547    
+           2   45.9349709       7.59637880               2   1.00000000       1.30976856       4.99611139       20.9562969       1.10340834       276.958374       3.27394366      0.528605223       9.96424770       9.92809677       1.46023603E-02   3.74645158E-03  0.535939753      0.668651462      0.411440790      0.568371892      0.701682985      0.443310648      0.246047333      0.287514150      0.605075479               1           2           0   33.5887871       29.4204731       211.787262      0.728999972      0.441100001      -131.242676       358.751740       0.00000000       14.4397926       10.2620192    
+
+       
+   Meaning of columns:
+1-pixel number
+2-latitude
+3-longitude
+4-surface class ( 1- clean, 2 - polluted, 3-partially snow -covered)
+5-snow fraction
+6-diameter of grains                                         (mm)
+7-snow specific surface area                                 (m*m/kg)
+8-effective absorption length                                (mm)
+9-reflection function of nonabsorbing snow       
+10- relative mass concentration of impurities (RMCI)         (ppm_weight)
+11-Angstrom Absorption Exponent of impurities
+12-impurity load parameter                                   (1/m)
+13-effective radius of dust grains                           (micrometers)
+14-volumetric absorption coefficient of impurities at 1000nm (1/mm)
+15-dust mass absorption coefficient at 660nm                 (m*m/g)
+16-dust mass absorption coefficient 1000nm                   (m*m/g)        
+17-shortwave plane broadband albedo (BBA)
+18-visible plane BBA
+19-NIR plane BBA
+20-shortwave spherical BBA
+21-visible spherical BBA
+22-NIR spherical BBA      
+23-Normalized Deifferential Bare Ice Index (NDBI)
+24-Normalized Deifferential Snow Index (NDSI)
+25-OLCI Spectral Index (OSI)
+26-Type of pollutants index (TPI): 2-soot, 1-dust, 0-other
+27-Bare Ice Index (BII): 2 - bare ice (polluted), 1- bare ice (clean), 0 - other
+28-Snow Binary Index (SBI): 0 - no snow, 1 - snow
+29-SZA
+30-VZA
+31-relative azimuthal angle
+32- TOA reflectance at channel 1
+33- TOA reflectance at channel 2
+34-retrieved total ozone column (TOC)                                            (DU)
+35-ECMWF TOC                                                                     (DU)
+36-difference between two values of TOC given above                              (%)
+37-difference between measured and simulated OLCI spectra for all OLCI channels  (%)
+38-difference between measured and simulated OLCI spectra for all OLCI channels except oxygen and water vapor absorption channels(%)
+
+Zero values signify the cases with no retrieval/calculation of corresponding parameters.
+
+2) spectral_spherical_albedo.dat
+     This file contains 26 columns:j,alat,alon,NCLASS,factor,(albs(ir),ir=1,21).
+     Namely: pixel number, latitude, longitude, surface class, snow fraction, spherical albedo at 21 OLCI channels.
+     The number of lines to be printed in specified in thv.dat file    
+     1   75.8274231      -36.4397621               2   1.00000000      0.989627540      0.990190327      0.989964962      0.987712204      0.986008108      0.979837060      0.969494402      0.957828581      0.956185639      0.954814851      0.944757879      0.927082062      0.922721386      0.919911921      0.917857468      0.910461307      0.870471776      0.844596446      0.835349083      0.817099273      0.676285326    
+           2   45.9349709       7.59637880               2   1.00000000      0.623685658      0.638322294      0.670124233      0.712336838      0.727539241      0.759727180      0.788228750      0.801117897      0.803286850      0.805021942      0.806113601      0.800135851      0.796759427      0.794088125      0.792236328      0.785112083      0.739739776      0.702348590      0.689214647      0.663334727      0.463497877    
+
+
+3)  spectral_plane_albedo.dat
+The same as above except for plane albedo
+   1   75.8274231      -36.4397621               2   1.00000000      0.990685105      0.991190791      0.990988314      0.988963962      0.987432361      0.981883705      0.972576082      0.962065518      0.960584223      0.959348142      0.950273633      0.934300482      0.930355072      0.927812159      0.925952077      0.919252276      0.882929802      0.859336495      0.850886822      0.834182978      0.703933001    
+           2   45.9349709       7.59637880               2   1.00000000      0.584516704      0.600143671      0.634266078      0.679902196      0.696429968      0.731579781      0.762875617      0.777079880      0.779473245      0.781388521      0.782593787      0.775996566      0.772273183      0.769328952      0.767288744      0.759445727      0.709728539      0.669069469      0.654857278      0.626962125      0.417030096    
+
+4)  spectral_BOAR.dat
+The same as above except for the bottom of atmosphere snow reflectance  
+           1   75.8274231      -36.4397621               2   1.00000000      0.963778436      0.964364707      0.964129984      0.961783469      0.960008740      0.953583658      0.942821681      0.930692375      0.928984940      0.927560568      0.917114615      0.898773909      0.894252837      0.891340911      0.889211953      0.881550133      0.840199947      0.813514292      0.803991020      0.785218358      0.641399980    
+           2   45.9349709       7.59637880               2   1.00000000      0.625290394      0.642985165      0.681714475      0.733699143      0.752576470      0.792808712      0.828723788      0.845052838      0.847805917      0.850009322      0.851396203      0.843806803      0.839525163      0.836140275      0.833795190      0.824783385      0.767784476      0.721340716      0.705144346      0.673414052      0.437516481    
+
+We also provide 4 files identical to those given above except we remove
+lines with  reduced accuracy retrievals or cloud contamination:
+
+ 5) output_snow_parameters_post.dat
+ 
+ 6) output_spectral_spherical_albedo_post.dat
+ 
+ 7) output_spectral_plane_albedo_post.dat
+ 
+ 8) output_spectral_BOAR_post.dat
+
+
+The last four files must be considered as main output of the algorithm.
