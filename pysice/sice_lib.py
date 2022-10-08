@@ -95,8 +95,10 @@ import os
 import xarray as xr
 import numpy as np
 import numba
-from constants_optim import wls, bai, xa, ya, f0, f1, f2, bet, gam, coef1, coef2, coef3, coef4
-from constants_optim import sol1_clean, sol2, sol3_clean, sol1_pol, sol3_pol, asol, bandcoord
+
+from .constants_optim import wls, bai, xa, ya, f0, f1, f2, bet, gam, coef1, coef2, coef3, coef4
+from .constants_optim import sol1_clean, sol2, sol3_clean, sol1_pol, sol3_pol, asol, bandcoord
+
 os.environ['PYTROLL_CHUNK_SIZE'] = '256'
 
 
@@ -175,7 +177,8 @@ def ozone_correction(OLCI_scene, write_ozone=False):
     # water and ozone spectral optical density
     # water_vod = genfromtxt('./tg_water_vod.dat', delimiter='   ')
     # self.voda = xr.DataArray(water_vod[0:21, 1], coords=[bandcoord])
-    ozone_vod = np.genfromtxt('./tg_vod.dat', delimiter='   ')
+    datadir = os.path.join(os.path.dirname(__file__), "data")
+    ozone_vod = np.genfromtxt(os.path.join(datadir, 'tg_vod.dat'), delimiter='   ')
     tozon = xr.DataArray(ozone_vod[0:21, 1], coords=[bandcoord])
 
     OLCI_scene['BXXX'], OLCI_scene['toa'] = molecular_absorption(OLCI_scene.ozone, tozon, OLCI_scene.sza, OLCI_scene.vza, OLCI_scene.toa)

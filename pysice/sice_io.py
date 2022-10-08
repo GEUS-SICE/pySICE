@@ -157,21 +157,24 @@ class sice_io(object):
                 del data.coords['crs']  # idem. zarr complains
             return data
 
+        self.olci_scene = xr.Dataset()
         for variable in variables:
-            setattr(self, variables[variable], get_var(variable))
+            self.olci_scene[variables[variable]] = get_var(variable)
+
         scene.unload()  # maybe useless
-        coef = 1 / np.cos(np.deg2rad(self.sza)) / 100.
+        coef = 1 / np.cos(np.deg2rad(self.olci_scene['sza'])) / 100.
 
         bands = [f'Oa{i:02}' for i in range(1, 22)]
         scene.load(bands)
 
         scene.load([satpy.DataQuery(name=band, calibration='reflectance') for band in bands])
-        self.toa = []
+        toa = []
         for band in bands:
-            self.toa.append(np.clip(get_var(band) * coef, 0, 1))
-        self.toa = xr.concat(self.toa, dim='band')
-        if 'crs' in self.toa.coords:
-            del self.toa.coords['crs']  # idem. zarr complains
+            toa.append(np.clip(get_var(band) * coef, 0, 1))
+        self.olci_scene['toa'] = xr.concat(toa, dim='band')
+
+        if 'crs' in self.olci_scene['toa'].coords:
+            del self.olci_scene['toa'].coords['crs']  # idem. zarr complains
 
         scene.unload()  # probably useless
 
@@ -201,18 +204,20 @@ class sice_io(object):
         if height is not None:
             islice['y'] = slice(y0, y0 + height)
 
+        self.olci_scene = xr.Dataset()
+
         def get_var(variable):
             # return the variable and remove what needs to be remove
             return ds[variable].isel(islice).stack(xy=("x", "y")).compute()
 
         for variable in variables:
-            setattr(self, variables[variable], get_var(variable))
+            self.olci_scene[variables[variable]] = get_var(variable)
 
         bands = [f'Oa{i:02}' for i in range(1, 22)]
-        self.toa = []
+        toa = []
         for band in bands:
-            self.toa.append(get_var(band))
-        self.toa = xr.concat(self.toa, dim='band')
+            toa.append(get_var(band))
+        self.olci_scene['toa'] = xr.concat(toa, dim='band')
 
     def to_geotif(self, extended_output=False, save_spectral=False):
         def write_output(var, var_name, in_folder, meta):

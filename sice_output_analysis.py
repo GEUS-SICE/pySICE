@@ -10,7 +10,7 @@ ipython.magic("matplotlib qt")
 
 import numpy as np
 import rasterio as rio
-import bav_lib as bl
+import pysice.bav_lib as bl
 import matplotlib.pyplot as plt
 import os
 plt.close('all')

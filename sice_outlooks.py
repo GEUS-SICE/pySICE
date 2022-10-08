@@ -11,7 +11,7 @@ import rasterio as rio
 import time
 import sys
 import os
-import bav_lib as bl
+import pysice.bav_lib as bl
 
 start_time = time.process_time()
 
