@@ -1,1 +1,0 @@
-from pysice import sice
