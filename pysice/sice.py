@@ -953,7 +953,7 @@ def process(OLCI_scene, compute_polluted=True, **kwargs):
     # retrieving snow impurities
     impurities = snow_impurities(snow)
 
-    OLCI_scene, snow = snow_albedo_direct(
+    snow = snow_albedo_direct(
         angles, aerosol, atmosphere, snow, impurities
     )
 
