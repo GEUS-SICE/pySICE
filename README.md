@@ -16,17 +16,12 @@ by  B. Vandecrux (2), A. Kokhanovsky (1), J. Box (2)
 ## Table of Contents  
 * [Running environment](#running-environment)  
 * [Theoretical background](#theoretical-background)  
-* [Scripts description](#scripts-description)  
-    * [Scripts overview](#scripts-overview)  
-    * [Input preparation](#input-preparation)  
-    * [Clean or polluted snow pixels](#clean-or-polluted-snow-pixels)  
-    * [Bottom of the atmosphere reflectance and broadband albedo](#test)  
+* [Script overview](#overview)  
+* [Input preparation](#input)  
+* [Outputs](#outputs)  
 * [Installation](#installation)  
-    * [Python](#python)
-    * [Download pySICE](#download)
-* [Examples](#examples)  
-    * [pySICE](#pysice)
-    * [Python interface for the fortran script sice.f	](#sicef)
+* [Example data](#examples)  
+* [Python interface for the fortran script sice.f	](#sicef)
 	
 ## Running environment
 developped on Python 3.7.6
@@ -38,21 +33,23 @@ The snow surface characteristics retrieval is based on the following work:
 * [Kokhanovsky et al. (2018) On the reflectance spectroscopy of snow](https://tc.copernicus.org/articles/12/2371/2018/)
 * [Kokhanovsky et al. (2019) Retrieval of Snow Properties from the Sentinel-3
 Ocean and Land Colour Instrument](http://dx.doi.org/10.3390/rs11192280)
-* [Kokhanovsky et al. (2020) The Determination of Snow Albedo from Satellite
-Measurements Using Fast Atmospheric
-Correction Technique](http://dx.doi.org/10.3390/rs12020234)
+* [Kokhanovsky et al. (2020) The Determination of Snow Albedo from Satellite Measurements Using Fast Atmospheric Correction Technique](http://dx.doi.org/10.3390/rs12020234)
+* [Vandecrux et al. (2022) The Determination of the Snow Optical Grain Diameter and Snowmelt Area on the Greenland Ice Sheet Using Spaceborne Optical Observations](https://doi.org/10.3390/rs14040932)
 
 The ozone total ozone retreival is described in 
 * [Kokhanovsky et al. (2020) Retrieval of the total ozone over Antarctica using Sentinel-3 ocean and land colour instrument](https://doi.org/10.1016/j.jqsrt.2020.107045)
 
 The Algorithm Theoretical Basis Document is available [here](docs/atbd/FINAL_SICE_ATBD__v3.0_MAY06_2020.pdf)
 
-## Scripts description
+<a name="overview"/>
 
-### Scripts overview
+
+## Scripts overview
 ![](docs/atbd/ATBD_plots1.png)
 
-### Input needed
+<a name="input"/>
+
+## Input needed
 
 Input files:
 |File |Description|
@@ -65,9 +62,10 @@ Input files:
 | r_TOA_01..21.tif | Top of the atmosphere OLCI reflectance|
 | SZA.tif  | Solar Zenith angle|
 | SAA.tif  | Solar azimuth angle|
-| WV.tif  | Water vapor|
 
-### Outputs
+<a name="outputs"/>
+
+## Outputs
 
 
 | File Name                            | Description                                                            | Units       |
@@ -91,34 +89,21 @@ Input files:
 
 
 
-
 | Diagnostic Code | Description                                                                                   |
 |-----------------|-----------------------------------------------------------------------------------------------|
 |               0 | clean snow                                                                                    |
 |               1 | polluted snow                                                                                 |
 |               3 | partially snow covered pixel                                                                  |
-|               6 | polluted snow for which r0 was calculated and not derived from observations                   |
-|               7 | polluted snow of calculated spherical albedo in bands 1 and 2 >0.98 reprocessed as clean snow |
 |             100 | sza<75, no retrival                                                                           |
 |             102 | TOA reflectance at band 21 < 0.1, no retrieval                                                |
 |             103 | TOA reflectance at band 1 < 0.2, no retrieval                                                 |
 |             104 | grain_diameter < 0.1, no retrieval, potential cloud flag                                      |
 |             105 | retrieved spherical albedo negative in band 1, 2 or 3                                         |
 |              -n | impossible to solve snow spherical albedo equation at band n                                  |
-  
 
-
-![](docs/atbd/SICE_overview1.png)
-
-### Clean or polluted snow pixels
-![](docs/atbd/SICE_overview2.png)
-
-<a name="test"/>
-
-### Bottom of the atmosphere reflectance and broadband albedo
-![](docs/atbd/SICE_overview3.png)
 
 <a name="installation"/>
+
 ## Installation
 
 We recommend the use of [Anaconda](https://www.anaconda.com/products/individual) and recent version of Python (>3.7).
@@ -136,6 +121,8 @@ pysice InputFolder OutputFolder
 
 The output is added to the OutputFolder if it is created, if not is is added to the InputFolder folder.
 
+<a name="examples"/>
+
 ## Example data
 
 Test input files are available [here](https://www.dropbox.com/s/b7wbervqls0p5cc/S3_test_data.zip?dl=0). Download and unzip using browser or with: 
@@ -147,7 +134,7 @@ unzip S3_test_data.zip -d S3_test_data
 
 <a name="sicef"/>
 
-### Python interface for the fortran script sice.f
+## Python interface for the fortran script sice.f
 sice_f.py reads the SICE-generated S3 geotiff files, converts them into ascii files, compiles and runs sice.f, reads the text outputs and save them into geotiff again.
 
 Compile sice.f:
@@ -162,6 +149,3 @@ Create the output folder and run the script:
 mkdir S3_test_data/fortran
 python fortran/sice_f.py ./S3_test_data
 ```
-
-
-
