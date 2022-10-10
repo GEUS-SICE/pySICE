@@ -540,40 +540,40 @@ def snow_albedo_direct(angles, aerosol, atmosphere, snow, impurities):
     return snow
 
 
-def spectral_toa_modelling(OLCI_scene, snow, angles):
-    # calculation of gaseous transmittance at 620, 940, and 761nm:             
-    # tt620 = OLCI_scene.toa.sel(7)  / snow["refl_direct"](7)
-    tt761 = OLCI_scene.toa.sel(band=12) / snow["refl_direct"].sel(band=12)
-    tt940 = OLCI_scene.toa.sel(band=19) / snow["refl_direct"].sel(band=19)
-
-    # calculation of gaseous vertical optical depth:         
-    vodka = -np.log(tt620)/angles.inv_cos_za
-		  
-    # calculation of TOA reflectance at 620 nm
-    r_toa_mod = ratm + t1t2 * r0 * snow["alb_sph"].sel(band=6) ** (u1 * u2 / r0) / (1 - snow["alb_sph"].sel(band=6) * albatm)
-    tt620=OLCI_scene.toa.sel(band=6)/r_toa_mod
-    tocos=vodka*9349.3
-    abs620= 4.4871e-2
-    r_toa_mod = OLCI_scene.toa * np.nan
-    for jt in range(21):
-        r_boa_mod.sel(band=jt) = OLCI_scene.toa.sel(band=jt) - f(snow["alb_sph"].sel(band=jt)/factor, 
-                       atmosphere.t1t2, snow.r0, angles.u1, angles.u2, 
-                       atmosphere.albatm, atmosphere.ratm, OLCI_scene.toa)
-				
-        tozone = t620 ** (cabsoz(jt) / abs620)
-        TOX=1.
-        TVODA=1.
-        if (jt == 13): TOX= tt761**1.
-        if (jt == 14): TOX= tt761**0.532
-        if (jt == 15): TOX= tt761**0.074  
-        if (jt == 19): TVODA=tt940**0.25
-        if (jt == 20): TVODA=tt940**1.
-        
-        r_toa_mod.sel(band=jt) = r_boa_mod * TVODA * TOX * tozone
-        if (BT < thv0): 
-            r_toa_mod.sel(band=jt) = r_toa_mod.sel(band=jt) * factor
-            
-     (OLCI_scene.toa - r_toa_mod) ** 2
+#def spectral_toa_modelling(OLCI_scene, snow, angles):
+#    # calculation of gaseous transmittance at 620, 940, and 761nm:             
+#    # tt620 = OLCI_scene.toa.sel(7)  / snow["refl_direct"](7)
+#    tt761 = OLCI_scene.toa.sel(band=12) / snow["refl_direct"].sel(band=12)
+#    tt940 = OLCI_scene.toa.sel(band=19) / snow["refl_direct"].sel(band=19)
+#
+#    # calculation of gaseous vertical optical depth:         
+#    vodka = -np.log(tt620)/angles.inv_cos_za
+#		  
+#    # calculation of TOA reflectance at 620 nm
+#    r_toa_mod = ratm + t1t2 * r0 * snow["alb_sph"].sel(band=6) ** (u1 * u2 / r0) / (1 - snow["alb_sph"].sel(band=6) * albatm)
+#    tt620=OLCI_scene.toa.sel(band=6)/r_toa_mod
+#    tocos=vodka*9349.3
+#    abs620= 4.4871e-2
+#    r_toa_mod = OLCI_scene.toa * np.nan
+#    for jt in range(21):
+#        r_boa_mod.sel(band=jt) = OLCI_scene.toa.sel(band=jt) - f(snow["alb_sph"].sel(band=jt)/factor, 
+#                       atmosphere.t1t2, snow.r0, angles.u1, angles.u2, 
+#                       atmosphere.albatm, atmosphere.ratm, OLCI_scene.toa)
+#				
+#        tozone = t620 ** (cabsoz(jt) / abs620)
+#        TOX=1.
+#        TVODA=1.
+#        if (jt == 13): TOX= tt761**1.
+#        if (jt == 14): TOX= tt761**0.532
+#        if (jt == 15): TOX= tt761**0.074  
+#        if (jt == 19): TVODA=tt940**0.25
+#        if (jt == 20): TVODA=tt940**1.
+#        
+#        r_toa_mod.sel(band=jt) = r_boa_mod * TVODA * TOX * tozone
+#        if (BT < thv0): 
+#            r_toa_mod.sel(band=jt) = r_toa_mod.sel(band=jt) * factor
+#            
+#     (OLCI_scene.toa - r_toa_mod) ** 2
     
 def compute_BBA(OLCI_scene, snow, angles, compute_polluted=True):
     # CalCULATION OF BBA of clean snow

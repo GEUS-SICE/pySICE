@@ -1,1 +1,1 @@
-import sice
+from pysice import sice
