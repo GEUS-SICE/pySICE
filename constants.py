@@ -154,11 +154,11 @@ alpha = 4 * np.pi * bai / wls
 
 
 # ozone vertical optical density  at OLCI channels
-# cabsoz = xr.DataArray([1.3782e-4, 3.0488e-4, 1.6457e-3, 8.9359e-3, 1.7505e-2,
-#                        4.3471e-2, 4.4871e-2, 2.1016e-2, 1.7162e-2, 1.4663e-2,
-#                        7.9830e-3, 3.8797e-3, 2.9338e-3, 2.7992e-3, 2.7297e-3,
-#                        3.2560e-3, 8.9569e-4, 5.1888e-4, 6.7158e-4, 3.1278e-4,
-#                        1.4088e-5], coords=[bandcoord])
+cabsoz = xr.DataArray([1.3782e-4, 3.0488e-4, 1.6457e-3, 8.9359e-3, 1.7505e-2,
+                        4.3471e-2, 4.4871e-2, 2.1016e-2, 1.7162e-2, 1.4663e-2,
+                        7.9830e-3, 3.8797e-3, 2.9338e-3, 2.7992e-3, 2.7297e-3,
+                        3.2560e-3, 8.9569e-4, 5.1888e-4, 6.7158e-4, 3.1278e-4,
+                        1.4088e-5], coords=[bandcoord])
 
 # relative vertical optical density of ozone f at all OLCI channels
 # (normalized to that at 620nm)
