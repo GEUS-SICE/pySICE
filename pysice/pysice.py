@@ -987,7 +987,7 @@ def process_by_chunk(OLCI_scene, chunk_size=150000, compute_polluted=True):
 
 
 
-if __name__ == "__main__":
+def main():
     # if the script is called from the command line, then parsing the input path and
     # passing it to the main function
     InputPath = sys.argv[1]
@@ -1015,3 +1015,5 @@ if __name__ == "__main__":
 
     write_output(snow, OutputFolder)
 
+if __name__ == "__main__":
+    main()
