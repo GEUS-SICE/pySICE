@@ -118,25 +118,25 @@ Input files:
 ### Bottom of the atmosphere reflectance and broadband albedo
 ![](docs/atbd/SICE_overview3.png)
 
+<a name="installation"/>
 ## Installation
-
-# Python
 
 We recommend the use of [Anaconda](https://www.anaconda.com/products/individual) and recent version of Python (>3.7).
 
-
-<a name="download"/>
-
-# Download pySICE
-
-Download the repository using the browser or typing in your command prompt
-
+The package can be installed as using
 ```
-git clone https://github.com/BaptisteVandecrux/pySICE.git
-cd pySICE
+pip install git+https://github.com/GEUS-SICE/pySICE.git@pySICEv2.1                                  
 ```
 
-## Examples
+The package can be run using
+
+```
+pysice InputFolder OutputFolder
+```
+
+The output is added to the OutputFolder if it is created, if not is is added to the InputFolder folder.
+
+## Example data
 
 Test input files are available [here](https://www.dropbox.com/s/b7wbervqls0p5cc/S3_test_data.zip?dl=0). Download and unzip using browser or with: 
 
@@ -144,19 +144,6 @@ Test input files are available [here](https://www.dropbox.com/s/b7wbervqls0p5cc/
 wget https://www.dropbox.com/s/b7wbervqls0p5cc/S3_test_data.zip
 unzip S3_test_data.zip -d S3_test_data
 ```
-
-
-### pySICE
-
-Simply run:
-
-
-```
-python sice.py ./S3_test_data
-```
-
-The output is added to the S3_test_data folder.
-
 
 <a name="sicef"/>
 
