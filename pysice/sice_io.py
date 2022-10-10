@@ -42,8 +42,9 @@ class sice_io(object):
 
         elif os.path.exists(os.path.join(dirname, "r_TOA_01.tif")):
             self._get_size_tif()
-
             self.open = self.open_tif
+        else:
+            print('No tif, netcdf or zarr file found in ', dirname)
 
     def _open_tif(self, filename):
         return rio.open(os.path.join(self.dirname, filename))
