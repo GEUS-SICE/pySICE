@@ -90,13 +90,21 @@
 # funp                      snow spectral planar and spherical albedo function
 import numpy as np
 import sys
-from sice_io import sice_io, write_output
 import time
 import os
 import xarray as xr
 import numba
-from constants import wls, bai, xa, ya, f0, f1, f2, bet, gam
-from constants import thv0, sol_vis, sol_nir, sol_sw, asol, cabsoz
+
+try:
+    from pysice.sice_io import sice_io, write_output
+except ImportError:
+    from sice_io import sice_io, write_output
+    
+try:
+    from pysice.constants import wls, bai, xa, ya, f0, f1, f2, bet, gam, thv0, sol_vis, sol_nir, sol_sw, asol, cabsoz
+except ImportError:
+    from constants import wls, bai, xa, ya, f0, f1, f2, bet, gam, thv0, sol_vis, sol_nir, sol_sw, asol, cabsoz
+    
 np.seterr(divide='ignore')
 np.seterr(invalid="ignore")
 os.environ["PYTROLL_CHUNK_SIZE"] = "256"

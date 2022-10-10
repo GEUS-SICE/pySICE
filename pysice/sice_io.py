@@ -9,13 +9,24 @@ tip list:
 """
 
 import os
-from glob import glob
 import xarray as xr
-import netCDF4
 import numpy as np
 import rioxarray
-import rasterio as rio
 
+try:
+    import rasterio as rio
+except ImportError:
+    rio = None  # make rasterio optional at this stage
+    
+try:
+    import netCDF4
+except ImportError:
+    netCDF4 = None  # make netCDF4 optional at this stage
+    
+try:
+    from glob import glob
+except ImportError:
+    glob = None  # make glob optional at this stage
 
 class sice_io(object):
     def __init__(self, dirname):
