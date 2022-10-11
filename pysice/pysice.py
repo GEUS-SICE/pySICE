@@ -297,7 +297,24 @@ def aerosol_properties(height, cos_sa, aot=0.07):
 
 
 def prepare_coef(aerosol, angles):
-    # args = (
+    args = (
+        aerosol.tau,
+        aerosol.g,
+        aerosol.p.transpose(),
+        angles.cos_sza,
+        angles.cos_vza,
+        angles.inv_cos_za,
+        aerosol.gaer,
+        aerosol.taumol.transpose(),
+        aerosol.tauaer,
+    )
+    inputdims = tuple([d.dims for d in args])
+    outputdims = [aerosol.tau.dims, aerosol.tau.dims, aerosol.tau.dims]
+    t1t2, albatm, r = xr.apply_ufunc(prepare_coef_numpy, 
+                                      *args, 
+                                      input_core_dims=inputdims,
+                                      output_core_dims=outputdims)
+    # t1t2, albatm, r = prepare_coef_xarray(
     #     aerosol.tau,
     #     aerosol.g,
     #     aerosol.p,
@@ -308,21 +325,6 @@ def prepare_coef(aerosol, angles):
     #     aerosol.taumol,
     #     aerosol.tauaer,
     # )
-    # inputdims = tuple([d.dims for d in args])
-    # outputdims = [aerosol.p.dims, aerosol.tau.dims, aerosol.p.dims]
-    # t1t2, albatm, r = xr.apply_ufunc(prepare_coef_numpy, *args, input_core_dims=inputdims, output_core_dims=outputdims)
-    t1t2, albatm, r = prepare_coef_xarray(
-        aerosol.tau,
-        aerosol.g,
-        aerosol.p,
-        angles.cos_sza,
-        angles.cos_vza,
-        angles.inv_cos_za,
-        aerosol.gaer,
-        aerosol.taumol,
-        aerosol.tauaer,
-    )
-
     atmosphere = xr.Dataset()
     atmosphere["t1t2"] = t1t2
     atmosphere["albatm"] = albatm
@@ -330,8 +332,8 @@ def prepare_coef(aerosol, angles):
     return atmosphere
 
 
-# @numba.jit(nopython=True, cache=True)
-def prepare_coef_xarray(tau, g, p, cos_sza, cos_vza, inv_cos_za, gaer, taumol, tauaer):
+@numba.jit(nopython=True, cache=True)
+def prepare_coef_numpy(tau, g, p, cos_sza, cos_vza, inv_cos_za, gaer, taumol, tauaer):
     # atmospheric reflectance
     b1 = 1.0 + 1.5 * cos_sza + (1.0 - 1.5 * cos_sza) * np.exp(-tau / cos_sza)
     b2 = 1.0 + 1.5 * cos_vza + (1.0 - 1.5 * cos_vza) * np.exp(-tau / cos_vza)
@@ -354,12 +356,8 @@ def prepare_coef_xarray(tau, g, p, cos_sza, cos_vza, inv_cos_za, gaer, taumol, t
     Baer = 0.5 + gaer * (gaer ** 2 - 3.0) / tz / 2.0
     # if gaer >= 1.e-3:
     #     Baer=(1 - gaer) * ((1 + gaer) / np.sqrt(1.+gaer**2) - 1) / 2 / gaer
-    Baer = xr.where(
-        gaer >= 0.001,
-        (1 - gaer) * ((1 + gaer) / np.sqrt(1.0 + gaer ** 2) - 1) / 2 / gaer,
-        Baer,
-    )
-    B = (0.5 * taumol + Baer * tauaer) / tau
+    Baer[gaer >= 0.001] = (1 - gaer) * ((1 + gaer) / np.sqrt(1.0 + gaer ** 2) - 1) / 2 / gaer
+    B = (0.5 * taumol + np.expand_dims(Baer * tauaer, -1)) / tau
     t1t2 = np.exp(-B * tau / cos_sza) * np.exp(-B * tau / cos_vza)
 
     # atmospheric spherical albedo (updated 2022)
@@ -372,6 +370,49 @@ def prepare_coef_xarray(tau, g, p, cos_sza, cos_vza, inv_cos_za, gaer, taumol, t
     W2 = 1 + 0.75 * tau * (1.0 - g)
     albatm = 1 - W1 / W2
     return t1t2, albatm, ratm
+
+
+# def prepare_coef_xarray(tau, g, p, cos_sza, cos_vza, inv_cos_za, gaer, taumol, tauaer):
+#     # atmospheric reflectance
+#     b1 = 1.0 + 1.5 * cos_sza + (1.0 - 1.5 * cos_sza) * np.exp(-tau / cos_sza)
+#     b2 = 1.0 + 1.5 * cos_vza + (1.0 - 1.5 * cos_vza) * np.exp(-tau / cos_vza)
+
+#     sumcos = cos_sza + cos_vza
+
+#     astra = (1.0 - np.exp(-tau * inv_cos_za)) / sumcos / 4.0
+#     oskar = 4.0 + 3.0 * (1 - g) * tau
+#     # multiple scattering contribution to the atmospheric reflectance
+#     rms = (
+#         1.0
+#         - b1 * b2 / oskar
+#         + (3.0 * (1.0 + g) * (cos_sza * cos_vza) - 2.0 * sumcos) * astra
+#     )
+
+#     ratm = p * astra + rms  # called ratm in new fortran code
+
+#     # atmospheric transmittance (updated 2022)
+#     tz = 1.0 + gaer ** 2 + (1.0 - gaer ** 2) * np.sqrt(1.0 + gaer ** 2)
+#     Baer = 0.5 + gaer * (gaer ** 2 - 3.0) / tz / 2.0
+#     # if gaer >= 1.e-3:
+#     #     Baer=(1 - gaer) * ((1 + gaer) / np.sqrt(1.+gaer**2) - 1) / 2 / gaer
+#     Baer = xr.where(
+#         gaer >= 0.001,
+#         (1 - gaer) * ((1 + gaer) / np.sqrt(1.0 + gaer ** 2) - 1) / 2 / gaer,
+#         Baer,
+#     )
+#     B = (0.5 * taumol + Baer * tauaer) / tau
+#     t1t2 = np.exp(-B * tau / cos_sza) * np.exp(-B * tau / cos_vza)
+
+#     # atmospheric spherical albedo (updated 2022)
+#     gasa = 0.5772157
+#     y = (1.0 + tau) * tau * np.exp(-tau) / 4.0
+#     z3 = tau ** 2 * (-np.log(tau) - gasa)
+#     z4 = tau ** 2 * (tau - tau ** 2 / 4 + tau ** 3 / 18)
+#     Z = z3 + z4
+#     W1 = 1 + (1.0 + 0.5 * tau) * Z / 2 - y
+#     W2 = 1 + 0.75 * tau * (1.0 - g)
+#     albatm = 1 - W1 / W2
+#     return t1t2, albatm, ratm
 
 
 def snow_albedo_solved(OLCI_scene, angles, aerosol, atmosphere, snow, compute_polluted=True):
