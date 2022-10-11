@@ -91,8 +91,8 @@ Input files:
 
 | Diagnostic Code | Description                                                                                   |
 |-----------------|-----------------------------------------------------------------------------------------------|
-|               0 | clean snow                                                                                    |
-|               1 | polluted snow                                                                                 |
+|               1 | clean snow                                                                                    |
+|               2 | polluted snow                                                                                 |
 |               3 | partially snow covered pixel                                                                  |
 |             100 | sza<75, no retrival                                                                           |
 |             102 | TOA reflectance at band 21 < 0.1, no retrieval                                                |

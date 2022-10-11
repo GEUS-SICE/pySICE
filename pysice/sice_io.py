@@ -356,10 +356,79 @@ def write_output(snow, OutputFolder):
         print(var)
         da_to_tif(snow[var],
                   os.path.join(OutputFolder, file_name_list[var] + ".tif"))
-        
-    da_to_tif(snow.alb_sph.sel(band=0), OutputFolder+'/alb_sph_01_solved.tif')
-    da_to_tif(snow.alb_sph_direct.sel(band=0), OutputFolder+'/alb_sph_01.tif')
-    da_to_tif(snow.rp.sel(band=0), OutputFolder+'/alb_pl_01_solved.tif')
-    da_to_tif(snow.rp_direct.sel(band=0), OutputFolder+'/alb_pl_01.tif')
+    # da_to_tif(snow.alb_sph.sel(band=0), OutputFolder+'/alb_sph_01_solved.tif')
+    # da_to_tif(snow.rp.sel(band=0), OutputFolder+'/alb_pl_01_solved.tif')
+
+    # if 'alb_sph_direct' in list(snow.keys()):
+    #     da_to_tif(snow.alb_sph_direct.sel(band=0), OutputFolder+'/alb_sph_01.tif')
+    # if 'rp_direct' in list(snow.keys()):
+    #     da_to_tif(snow.rp_direct.sel(band=0), OutputFolder+'/alb_pl_01.tif')
     # for var in ['BXXX', ]:
     #     var = OLCI_scene[var].unstack(dim='xy').transpose('y', 'x').rio.to_raster(os.path.join(OutputFolder, file_name_list[var] + '.tif'))
+
+import argparse
+import sys
+
+def get_parser():
+    """
+    Define all arguments and store them in a parser
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "input_folder",
+        nargs="?",
+        help="Path to input folder, containing OLCI radiance files",
+        type=str)
+    parser.add_argument(
+        "output_folder",
+        nargs="?",
+        help="Path to output folder (same as input folder if non-existent or not specified)",
+        type=str)
+    parser.add_argument(
+        "-i", "--fl_in", "--input",
+        help="Path to input folder, containing OLCI radiance files (or use first positional argument)",
+        type=str)
+    parser.add_argument(
+        "-o", "--fl_out", "--output",
+        help="Path to output folder (or use last positional argument)",
+        type=str)
+    parser.add_argument(
+        "-c", "--clean_snow",
+        help="If present, processes all pixels as clean snow",
+        action="store_true")
+    return parser
+
+
+def parse_args(args):
+    """
+    Returns arguments passed on command line
+    """
+    return get_parser().parse_args(args)
+
+
+def get_input_folder(args):
+    """
+    Retrieve the input folder.
+    If no input folder is specified, show error message and exit.
+    """
+    if args.input_folder:
+        return args.input_folder
+    if args.fl_out:
+        return args.fl_out
+    print('Error: You failed to provide input folder!\n')
+    get_parser().print_help()
+    print('\n')
+    print('Post questions, suggestions, patches at https://github.com/GEUS-SICE/pySICE')
+    sys.exit(1)
+
+
+def get_output_folder(args):
+    """
+    Retrieve the input folder.
+    If no input folder is specified, show error message and exit.
+    """
+    if args.output_folder:
+        return args.output_folder
+    if args.fl_out:
+        return args.fl_out
+    return args.input_folder

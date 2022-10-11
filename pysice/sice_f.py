@@ -214,15 +214,24 @@ output_sice_f(
 import xarray as xr
 import rioxarray
 import matplotlib.pyplot as plt
+import matplotlib.colors as clr
 import matplotlib.cm as cm
 #%matplotlib qt
 import numpy as np
+
+isnow_label = {1: 'clean snow', 2: 'polluted snow', 3: 'mixed pixel', 
+               100: 'SZA > 75', 
+               102: 'TOA(21) < 0.1', 
+               103: 'TOA(1) < 0.2', 
+               104: 'grain_diameter < 0.1', 
+               105: 'solver crashed'}
+
 #data_folder = 'data/2019-06-14/'
 #code_ver1 = 'pySICEv1.6'
 #code_ver2 = 'pySICEv2.0'
-data_folder = 'data/5_km_res/'
-code_ver1 = 'pySICEv2.0'
-code_ver2 = 'fortran'
+data_folder = '../data/5_km_res/'
+code_ver1 = 'pySICEv2.0_clean'
+code_ver2 = 'pySICEv2.0'
 folder1 = data_folder+code_ver1+'/'
 folder2 =  data_folder+code_ver2+'/'
 var_list = ['isnow', "grain_diameter", "snow_specific_area",   
@@ -244,27 +253,49 @@ for var in var_list:
     vmax = max(ds_f.max(), ds_p.max())
     
     if var == 'isnow':
+
         if 'v1.6' in code_ver2:
             ds_f = ds_f.where(ds_f>=0).where(ds_f<10)+1
         ds_f=ds_f.rename('isnow')
+        from matplotlib.colors import from_levels_and_colors
+
         isnow = ds_p.copy()
-        num_class = np.max(ds_f.values[ds_f.notnull()])
-        param = {'cmap':cm.get_cmap('PiYG', num_class),
-                 'cbar_kwargs':{'ticks': np.arange(num_class+1)}}
-        vmin = min(ds_f.min(), ds_p.min())-0.5
-        vmax = max(ds_f.max(), ds_p.max())+0.5
+        vals = np.unique(isnow.values).tolist() + np.unique(ds_f.values).tolist()
+        vals = [*set(vals)]
+        vals.sort()
+        vals = [v for v in vals if v<900]
+        vals.append(vals[-1]+1)
+        # vals.remove(999.0)
+        ds_p = ds_p.where(ds_p!=999.0)
+        ds_f = ds_f.where(ds_f!=999.0)
+        cmap = cm.get_cmap('rainbow')
+        cmap, norm = from_levels_and_colors(vals,
+                                            [cmap(x) for x in np.linspace(0,1,len(vals)-1)])
+        mapper = cm.ScalarMappable(norm=norm, cmap=cmap)
+        mapper.set_array([vals[0]-0.5, vals[-1]+1])
+        param = {'cmap':cmap,
+                 'norm':norm,
+                 'add_colorbar':False}
+        
+
     else:
-        param = {}
+        param = {'vmin':vmin, 'vmax':vmax}
 
     fig, ax = plt.subplots(2,2, figsize=(15,15))
     ax=ax.flatten()
 
-        
-    ds_f.dropna('x', 'all').dropna('y', 'all').plot(ax=ax[0], vmin=vmin, vmax=vmax,**param )
+    ds_f.dropna('x', 'all').dropna('y', 'all').plot(ax=ax[0],**param )
     ax[0].set_title(code_ver1)
-    ds_p.dropna('x', 'all').dropna('y', 'all').plot(ax=ax[1], vmin=vmin, vmax=vmax,**param)
+    ds_p.dropna('x', 'all').dropna('y', 'all').plot(ax=ax[1],**param)
     ax[1].set_title(code_ver2)
-    
+    if var == 'isnow':
+        cbar1 = fig.colorbar(mapper, ax=ax[0])
+        cbar2 = fig.colorbar(mapper, ax=ax[1])
+        
+        cbar1.set_ticks(np.array(vals[:-1]) + np.diff(np.array(vals))/2)
+        cbar2.set_ticks(np.array(vals[:-1]) + np.diff(np.array(vals))/2)
+        cbar1.ax.set_yticklabels([isnow_label[v] for v in vals[:-1]])
+        cbar2.ax.set_yticklabels([isnow_label[v] for v in vals[:-1]])
     (ds_p-ds_f).dropna('x', 'all').dropna('y', 'all').plot(ax=ax[2], cbar_kwargs={'label': code_ver2+' - '+code_ver1})
     ax[2].set_title(code_ver2+' - '+code_ver1)
     ds_f = ds_f.where(ds_p.notnull())

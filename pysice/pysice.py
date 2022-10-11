@@ -96,15 +96,15 @@ import xarray as xr
 import numba
 
 try:
-    from pysice.sice_io import sice_io, write_output
+    from pysice.sice_io import sice_io, write_output, parse_args, get_input_folder, get_output_folder
 except ImportError:
-    from sice_io import sice_io, write_output
-    
+    from sice_io import sice_io, write_output, parse_args, get_input_folder, get_output_folder
+
 try:
     from pysice.constants import wls, bai, xa, ya, f0, f1, f2, bet, gam, thv0, sol_vis, sol_nir, sol_sw, asol, cabsoz
 except ImportError:
     from constants import wls, bai, xa, ya, f0, f1, f2, bet, gam, thv0, sol_vis, sol_nir, sol_sw, asol, cabsoz
-    
+
 np.seterr(divide='ignore')
 np.seterr(invalid="ignore")
 os.environ["PYTROLL_CHUNK_SIZE"] = "256"
@@ -160,16 +160,16 @@ def rinff(cos_sza, cos_vza, theta):
     )
 
 
-def prepare_processing(OLCI_scene, angles):
+def prepare_processing(OLCI_scene, angles, compute_polluted=True):
     # Filtering pixels unsuitable for retrieval
     snow = xr.Dataset()
     snow["isnow"] = OLCI_scene['sza']*np.nan
-    # snow["isnow"] = xr.where(OLCI_scene.toa[20] < 0.1, 102, np.nan)
-    snow["isnow"] = xr.where(OLCI_scene['sza'].isnull(), np.nan, 999)
-    # snow.isnow[OLCI_scene.toa[0] < 0.2] = 103
-    # snow.isnow[OLCI_scene.sza > 75] = 100
+    snow["isnow"] = xr.where(OLCI_scene.toa[20] < 0.1, 102, snow.isnow)
+    snow["isnow"] = xr.where(OLCI_scene.toa[0] < 0.2, 103, snow.isnow)
+    snow["isnow"] = xr.where(OLCI_scene.sza > 75, 100, snow.isnow)
+    snow["isnow"] = xr.where(OLCI_scene['sza'].isnull(), 999, snow.isnow)
 
-    mask = (snow.isnow==999)
+    mask = (snow.isnow.isnull())
     OLCI_scene["toa"] = OLCI_scene.toa.where(mask)
     OLCI_scene["vaa"] = OLCI_scene.vaa.where(mask)
     OLCI_scene["saa"] = OLCI_scene.saa.where(mask)
@@ -186,22 +186,25 @@ def prepare_processing(OLCI_scene, angles):
     )
 
     # case of not 100% snow cover:
-    ind_nonan = snow.isnow.notnull()
-    msk = OLCI_scene.toa.sel(band=0) < thv0
-    snow.isnow[msk] = 3
-    snow.isnow[~msk] = 1
-    snow['isnow'] = snow.isnow.where(ind_nonan)
-    # scaling factor for patchy snow at 400nm
-    psi = rinff(angles["cos_sza"], angles["cos_vza"], angles["theta"])
-    # factor=snow fraction ( SMALLER THAN 1.0):
-    snow["factor"] = xr.where(msk, OLCI_scene.toa.sel(band=0) / psi, 1)
+    snow['isnow'] = xr.where(snow.isnow.isnull(), 1, snow.isnow )
+    
+    if compute_polluted:
+        msk = OLCI_scene.toa.sel(band=0) < thv0
+        snow['isnow'] = xr.where(msk & (snow.isnow == 1), 3, snow.isnow)
 
-    # snow TOA corrected for snow fraction
-    OLCI_scene["toa"] = xr.where(
-        msk, 
-        OLCI_scene["toa"] / snow["factor"], 
-        OLCI_scene["toa"]
-    )
+        # scaling factor for patchy snow at 400nm
+        psi = rinff(angles["cos_sza"], angles["cos_vza"], angles["theta"])
+        # factor=snow fraction ( SMALLER THAN 1.0):
+        snow["factor"] = xr.where(msk, OLCI_scene.toa.sel(band=0) / psi, 1)
+    
+        # snow TOA corrected for snow fraction
+        OLCI_scene["toa"] = xr.where(
+            msk, 
+            OLCI_scene["toa"] / snow["factor"], 
+            OLCI_scene["toa"]
+        )
+    else:
+        snow["factor"] = OLCI_scene["sza"]*0+1
     return OLCI_scene, snow
 
 
@@ -236,8 +239,8 @@ def snow_properties(OLCI_scene, angles, snow):
     # filtering small D
     # diameter_thresh = 0.1
 
-    valid = D >= 0  # diameter_thresh
-    # snow.isnow[~valid & np.isnan(snow.isnow)] = 104
+    valid = D >= 0.1  # diameter_thresh
+    snow['isnow'] = xr.where((D < 0.1) & (snow.isnow < 100), 104, snow.isnow)
     OLCI_scene["toa"] = OLCI_scene.toa.where(valid)
     snow["diameter"] = D.where(valid)
     snow["area"] = area.where(valid)
@@ -371,7 +374,7 @@ def prepare_coef_xarray(tau, g, p, cos_sza, cos_vza, inv_cos_za, gaer, taumol, t
     return t1t2, albatm, ratm
 
 
-def snow_albedo_solved(OLCI_scene, angles, aerosol, atmosphere, snow):
+def snow_albedo_solved(OLCI_scene, angles, aerosol, atmosphere, snow, compute_polluted=True):
     # solving iteratively the transcendental equation
     # Update 2022: for all pixels!
     snow["alb_sph"] = OLCI_scene.toa * np.nan
@@ -411,7 +414,7 @@ def snow_albedo_solved(OLCI_scene, angles, aerosol, atmosphere, snow):
                                                     1, 
                                                     snow.alb_sph.sel(band=i_channel))
     # some filtering
-    snow["alb_sph"] = snow.alb_sph.where(snow.isnow >= 0)
+    # snow["alb_sph"] = snow.alb_sph.where(snow.isnow >= 0)
     # ind_neg_alb = (
     #     (snow.alb_sph.sel(band=0) < 0)
     #     | (snow.alb_sph.sel(band=1) < 0)
@@ -427,15 +430,16 @@ def snow_albedo_solved(OLCI_scene, angles, aerosol, atmosphere, snow):
     )
     snow["alb_sph"] = snow["factor"] * snow["alb_sph"]
     
-    ind_no_nan = snow["isnow"].notnull()
-    snow["isnow"] = xr.where(snow.alb_sph.sel(band=0) > 0.98, 1, snow.isnow)
-    snow["isnow"] = xr.where(
-        (snow.alb_sph.sel(band=0) <= 0.98) & (snow.factor > 0.99), 2, snow.isnow
-    )
-    snow["isnow"] = xr.where(
-        (snow.alb_sph.sel(band=0) <= 0.98) & (snow.factor <= 0.99), 3, snow.isnow
-    )
-    snow["isnow"] = snow["isnow"].where(ind_no_nan)
+    if compute_polluted:
+        ind_no_nan = snow["isnow"].notnull()
+        snow["isnow"] = xr.where(snow.alb_sph.sel(band=0) > 0.98, 1, snow.isnow)
+        snow["isnow"] = xr.where(
+            (snow.alb_sph.sel(band=0) <= 0.98) & (snow.factor > 0.99), 2, snow.isnow
+        )
+        snow["isnow"] = xr.where(
+            (snow.alb_sph.sel(band=0) <= 0.98) & (snow.factor <= 0.99), 3, snow.isnow
+        )
+        snow["isnow"] = snow["isnow"].where(ind_no_nan)
     return OLCI_scene, snow
 
 
@@ -942,20 +946,27 @@ def zbrent(x0, x1, args=(), max_iter=100, tolerance=1e-12):
 
 def process(OLCI_scene, compute_polluted=True, **kwargs):
     angles = view_geometry(OLCI_scene)
-    OLCI_scene, snow = prepare_processing(OLCI_scene, angles)
+    OLCI_scene, snow = prepare_processing(OLCI_scene, angles, compute_polluted=compute_polluted)
     OLCI_scene, angles, snow = snow_properties(OLCI_scene, angles, snow)
     aerosol = aerosol_properties(OLCI_scene.elevation, angles.cos_sa, aot=0.07)
     atmosphere = prepare_coef(aerosol, angles)
 
     # first guess for the snow spherical albedo
-    OLCI_scene, snow = snow_albedo_solved(OLCI_scene, angles, aerosol, atmosphere, snow)
+    OLCI_scene, snow = snow_albedo_solved(OLCI_scene, angles, aerosol, atmosphere, snow, compute_polluted=compute_polluted)
 
     # retrieving snow impurities
-    impurities = snow_impurities(snow)
+    if compute_polluted:
+        impurities = snow_impurities(snow)
 
-    snow = snow_albedo_direct(
-        angles, aerosol, atmosphere, snow, impurities
-    )
+        snow = snow_albedo_direct(
+            angles, aerosol, atmosphere, snow, impurities
+        )
+    else:
+        impurities = xr.Dataset()
+        impurities["ntype"] = np.nan
+        impurities["polut"] = np.nan
+        impurities["bm"] = np.nan
+        impurities["aload_ppm"] = np.nan
 
     snow = compute_BBA(OLCI_scene, snow, angles, compute_polluted=compute_polluted)
     return snow
@@ -986,16 +997,19 @@ def process_by_chunk(OLCI_scene, chunk_size=150000, compute_polluted=True):
     return snow
 
 
-
 def main():
     # if the script is called from the command line, then parsing the input path and
     # passing it to the main function
-    InputPath = sys.argv[1]
-    if len(sys.argv) >= 3:
-        OutputFolder = sys.argv[2]
+    args = parse_args(sys.argv[1:])
+    InputPath = get_input_folder(args)
+    OutputFolder = get_output_folder(args)
+    if args.clean_snow:
+        compute_polluted = False
+        print('Retrieving all pixels as clean snow')
     else:
-        OutputFolder = sys.argv[1] + "/"
-    print('Start sice.py')
+        compute_polluted = True
+
+    print('Start pysice.py')
     print('Input folder:', InputPath)
     print('Output folder:', OutputFolder)
 
@@ -1006,9 +1020,9 @@ def main():
     start_time = time.process_time()
 
     if len(OLCI_scene.xy)<1000000:
-        snow = process(OLCI_scene)
+        snow = process(OLCI_scene, compute_polluted=compute_polluted)
     else:
-        snow = process_by_chunk(OLCI_scene, chunk_size=500000)
+        snow = process_by_chunk(OLCI_scene, chunk_size=500000, compute_polluted=compute_polluted)
 
     duration = time.process_time() - start_time
     print("Time elapsed: ", duration)
