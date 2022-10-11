@@ -229,17 +229,17 @@ def snow_properties(OLCI_scene, angles, snow):
     al = bal / 1000.0
 
     # effective grain size(mm):diameter
-    # xi/(1-g) = 9.2
-    # D = al/(9.2*16/9)
-    D = al / 16
+    # B/(1-g) = 9.2
+    D = al/(9.2*16/9)
+    # Alex 2022:
+    # B/(1-g) = 9
+    # D = al / 16
     # snow specific area ( dimension: m*m/kg)
-    # area = 6./D/0.917
-    area = 104.7 / al
+    area = 6./D/0.917
 
     # filtering small D
-    # diameter_thresh = 0.1
-
-    valid = D >= 0.1  # diameter_thresh
+    diameter_thresh = 0.1
+    valid = D >= diameter_thresh
     snow['isnow'] = xr.where((D < 0.1) & (snow.isnow < 100), 104, snow.isnow)
     OLCI_scene["toa"] = OLCI_scene.toa.where(valid)
     snow["diameter"] = D.where(valid)

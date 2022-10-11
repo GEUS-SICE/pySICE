@@ -12,6 +12,8 @@ import os
 import xarray as xr
 import numpy as np
 import rioxarray
+import argparse
+import sys
 
 try:
     import rasterio as rio
@@ -348,7 +350,7 @@ def write_output(snow, OutputFolder):
     
     def da_to_tif(da, file_path):
         da = da.unstack(dim="xy").transpose("y", "x")
-        da.reindex(y=list(reversed(da.y))).rio.to_raster(file_path,
+        da.rio.to_raster(file_path,
             dtype='float32',compress='DEFLATE')
         
     print('Printing out:')
@@ -365,9 +367,6 @@ def write_output(snow, OutputFolder):
     #     da_to_tif(snow.rp_direct.sel(band=0), OutputFolder+'/alb_pl_01.tif')
     # for var in ['BXXX', ]:
     #     var = OLCI_scene[var].unstack(dim='xy').transpose('y', 'x').rio.to_raster(os.path.join(OutputFolder, file_name_list[var] + '.tif'))
-
-import argparse
-import sys
 
 def get_parser():
     """
@@ -428,7 +427,11 @@ def get_output_folder(args):
     If no input folder is specified, show error message and exit.
     """
     if args.output_folder:
-        return args.output_folder
+        out = args.output_folder
     if args.fl_out:
-        return args.fl_out
-    return args.input_folder
+        out = args.fl_out
+    if os.path.exists(out):
+        return out
+    else:
+        print('Output folder does not exist. Using input folder instead.')
+        return args.input_folder

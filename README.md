@@ -119,7 +119,33 @@ The package can be run using
 pysice InputFolder OutputFolder
 ```
 
-The output is added to the OutputFolder if it is created, if not is is added to the InputFolder folder.
+The output is added to the OutputFolder if it exists, if not is is added to the InputFolder folder.
+See help for other possibilities:
+
+```
+pysice -h
+
+
+usage: pysice.py [-h] [-i FL_IN] [-o FL_OUT] [-c]
+                 [input_folder] [output_folder]
+
+positional arguments:
+  input_folder          Path to input folder, containing OLCI radiance files
+  output_folder         Path to output folder (same as input folder if non-
+                        existent or not specified)
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i FL_IN, --fl_in FL_IN, --input FL_IN
+                        Path to input folder, containing OLCI radiance files
+                        (or use first positional argument)
+  -o FL_OUT, --fl_out FL_OUT, --output FL_OUT
+                        Path to output folder (or use last positional
+                        argument)
+  -c, --clean_snow      If present, processes all pixels as clean snow
+
+```
+
 
 <a name="examples"/>
 
