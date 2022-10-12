@@ -81,7 +81,7 @@ Input files:
 | rBRR_01..21.tif                      | bottom of the atmosphere surface reflectance (OLCI bands 1 through 21) |             |
 | albedo_spectral_planar_01..21.tif    | spectral planar albedo (OLCI bands 1 to 11 and 16 to 21)               |             |
 | albedo_spectral_spherical_01..21.tif | spectral spherical albedo (OLCI bands 1 to 11 and 16 to 21)            |             |
-| diagnostic_retrieval.tif             | See next table                                                         |             |
+| isnow.tif                            | See next table                                                         |             |
 | conc.tif                             | pollutant concentration (volumetric concentration)                     |             |
 | al.tif                               | effective absorption length(mm)                                        |             |
 | r0.tif                               | reflectance of a semi-infinite non-absorbing snow layer                |             |
@@ -126,7 +126,8 @@ See help for other possibilities:
 pysice -h
 
 
-usage: pysice.py [-h] [-i FL_IN] [-o FL_OUT] [-c]
+usage: pysice.py [-h] [-i FL_IN] [-o FL_OUT] [-c [CLEAN_SNOW]]
+                 [--no_qc [NO_QC]] [--no_oz [NO_OZ]]
                  [input_folder] [output_folder]
 
 positional arguments:
@@ -142,7 +143,13 @@ optional arguments:
   -o FL_OUT, --fl_out FL_OUT, --output FL_OUT
                         Path to output folder (or use last positional
                         argument)
-  -c, --clean_snow      If present, processes all pixels as clean snow
+  -c [CLEAN_SNOW], --clean_snow [CLEAN_SNOW]
+                        If present, processes all pixels as clean snow
+  --no_qc [NO_QC]       If present, does not run quality check
+  --no_oz [NO_OZ]       If present, does not retrieve ozone
+
+
+Post questions, suggestions, patches at https://github.com/GEUS-SICE/pySICE
 
 ```
 

@@ -22,9 +22,9 @@ import shutil
 import glob
 import subprocess
 import geopandas as gpd
-InputFolder = './data/5_km_res/'
-OutputFolder = './data/5_km_res/fortran/'
-ProcessingFolder = './fortran/'
+InputFolder = '../data/5_km_res/'
+OutputFolder = '../data/5_km_res/fortran/'
+ProcessingFolder = '../fortran/'
 # %% 
 start_time = time.time()
 InputFolder = InputFolder + "/"
@@ -152,6 +152,10 @@ output_sice_f(OutputFolder + "snow_parameters.dat", "bm", 10)
 output_sice_f(OutputFolder + "snow_parameters.dat", "polut", 11)
 output_sice_f(OutputFolder + "snow_parameters.dat", "albedo_bb_planar_sw", 16)
 output_sice_f(OutputFolder + "snow_parameters.dat", "albedo_bb_spherical_sw", 19)
+output_sice_f(OutputFolder + "snow_parameters.dat", "tocos", 33)
+output_sice_f(OutputFolder + "snow_parameters.dat", "difoz", 35)
+output_sice_f(OutputFolder + "snow_parameters.dat", "cv1", 36)
+output_sice_f(OutputFolder + "snow_parameters.dat", "cv2", 37)
 
 i = 0
 output_sice_f(
@@ -230,28 +234,34 @@ isnow_label = {1: 'clean snow', 2: 'polluted snow', 3: 'mixed pixel',
 #code_ver1 = 'pySICEv1.6'
 #code_ver2 = 'pySICEv2.0'
 data_folder = '../data/5_km_res/'
-code_ver1 = 'pySICEv2.0_clean'
-code_ver2 = 'pySICEv2.0'
+code_ver1 = 'fortran'
+code_ver2 = 'pySICEv2.1_qc'
 folder1 = data_folder+code_ver1+'/'
 folder2 =  data_folder+code_ver2+'/'
-var_list = ['isnow', "grain_diameter", "snow_specific_area",   
-            "r0", "albedo_bb_planar_sw",  "albedo_bb_spherical_sw"]
+var_list = ['isnow', "tocos","cv1","cv2","difoz"]
+# var_list = ['isnow', "grain_diameter", "snow_specific_area",   
+#             "r0", "albedo_bb_planar_sw",  "albedo_bb_spherical_sw","tocos","cv1","cv2","difoz"]
 # var_list = ["isnow", "alb_sph_01", "alb_sph_01_solved", "alb_pl_01", "alb_pl_01_solved", "BOAR_01", "BOAR_01_solved"]
 plt.close('all')
 for var in var_list:
     ds_f = rioxarray.open_rasterio(folder1+var+'.tif').squeeze()
     ds_p = rioxarray.open_rasterio(folder2+var+'.tif').squeeze()
     
-    if var == 'polut':
+    if var == 'difoz':
+        ds_f = ds_f.where(ds_f>0)
+
+    if var in ['polut', 'difoz']:
         ds_f = np.log10(ds_f)
         ds_p = np.log10(ds_p)
-        
+    
     if var in ['albedo_bb_planar_sw', 'albedo_bb_spherical_sw']:
         ds_f = ds_f.where(ds_f>0).where(ds_f<2)
 
     vmin = min(ds_f.min(), ds_p.min())
     vmax = max(ds_f.max(), ds_p.max())
-    
+    if 'cv' in var:
+        vmin = 0
+        vmax = 15
     if var == 'isnow':
 
         if 'v1.6' in code_ver2:
@@ -260,12 +270,12 @@ for var in var_list:
         from matplotlib.colors import from_levels_and_colors
 
         isnow = ds_p.copy()
-        vals = np.unique(isnow.values).tolist() + np.unique(ds_f.values).tolist()
-        vals = [*set(vals)]
-        vals.sort()
-        vals = [v for v in vals if v<900]
-        vals.append(vals[-1]+1)
-        # vals.remove(999.0)
+        vals = np.append(np.unique(isnow.values), np.unique(ds_f.values))
+        vals = vals[~np.isnan(vals)]
+        vals = np.unique(vals)
+        vals = np.sort(vals)
+        vals = vals[vals<900]
+        vals = np.append(vals, vals[-1]+1)
         ds_p = ds_p.where(ds_p!=999.0)
         ds_f = ds_f.where(ds_f!=999.0)
         cmap = cm.get_cmap('rainbow')

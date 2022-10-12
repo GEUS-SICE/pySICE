@@ -420,6 +420,7 @@ c          quality of retrievals and print of retrieved snow characteristics
          sum1=sqrt(sum1/21.)
          sum2=sum2/21.
          cv1=100.*sum1/sum2
+
          um1=0.
          um2=0.
          do 202 MNK=1,21
@@ -434,6 +435,7 @@ c          quality of retrievals and print of retrieved snow characteristics
         um1=sqrt(um1/16.)
         um2=um2/16.
         cv2=100.*um1/um2
+
         difoz=0.0
         if (tocos.gt.0.)difoz=100.*(tocos-akozon)/tocos
         DIFKA=abs(difoz)

@@ -130,8 +130,7 @@ class sice_io(object):
 
         mask = ~np.isnan(self.olci_scene.toa.sel(band=0))
         self.olci_scene = self.olci_scene.where(mask)
-
-        t = self.olci_scene.elevation.unstack("xy")
+        t = self.olci_scene.toa.unstack("xy")
         self.meta["width"] = len(t.x)
         self.meta["height"] = len(t.y)
 
@@ -346,6 +345,10 @@ def write_output(snow, OutputFolder):
         "rp3": "albedo_bb_planar_sw",
         "rs3": "albedo_bb_spherical_sw",
         "factor": "factor",
+        "tocos": "03_SICE",
+        "cv1": "cv1",
+        "cv2": "cv2",
+        "difoz": "difoz",
     }
     
     def da_to_tif(da, file_path):
@@ -353,11 +356,11 @@ def write_output(snow, OutputFolder):
         da.rio.to_raster(file_path,
             dtype='float32',compress='DEFLATE')
         
-    print('Printing out:')
-    for var in ["diameter", "area", "rp3", "rs3", "isnow", "r0", "al", 'factor']:
-        print(var)
-        da_to_tif(snow[var],
-                  os.path.join(OutputFolder, file_name_list[var] + ".tif"))
+    for var in ["diameter", "area", "rp3", "rs3", "isnow", "r0", "al", 'factor', 'tocos','cv1','cv2','difoz']:
+        if var in snow.keys():
+            da_to_tif(snow[var],
+                      os.path.join(OutputFolder, file_name_list[var] + ".tif"))
+
     # da_to_tif(snow.alb_sph.sel(band=0), OutputFolder+'/alb_sph_01_solved.tif')
     # da_to_tif(snow.rp.sel(band=0), OutputFolder+'/alb_pl_01_solved.tif')
 
@@ -365,8 +368,6 @@ def write_output(snow, OutputFolder):
     #     da_to_tif(snow.alb_sph_direct.sel(band=0), OutputFolder+'/alb_sph_01.tif')
     # if 'rp_direct' in list(snow.keys()):
     #     da_to_tif(snow.rp_direct.sel(band=0), OutputFolder+'/alb_pl_01.tif')
-    # for var in ['BXXX', ]:
-    #     var = OLCI_scene[var].unstack(dim='xy').transpose('y', 'x').rio.to_raster(os.path.join(OutputFolder, file_name_list[var] + '.tif'))
 
 def get_parser():
     """
@@ -393,8 +394,19 @@ def get_parser():
         type=str)
     parser.add_argument(
         "-c", "--clean_snow",
+        nargs="?", const=True, default=False,
         help="If present, processes all pixels as clean snow",
-        action="store_true")
+        action="store")
+    parser.add_argument(
+        "--no_qc",
+        nargs="?", const=True, default=False,
+        help="If present, does not run quality check",
+        action="store")
+    parser.add_argument(
+        "--no_oz",
+        nargs="?", const=True, default=False,
+        help="If present, does not retrieve ozone",
+        action="store")
     return parser
 
 

@@ -261,8 +261,8 @@ def aerosol_properties(height, cos_sa, aot=0.07):
     # 2021 version:
     # taumol = wls**(-4.05) * np.minimum(1, np.exp(-height / 7400)) * 0.00877
     # MOLEC = 1 version:
-    taumol = 0.008735 * wls ** (-4.08)
-    taumol = xr.where((height / 6000) > 0,
+    taumol = 0.008735 * wls ** (-4.08) * xr.ones_like(height)
+    taumol = xr.where((height*xr.ones_like(wls) / 6000) > 0,
                       taumol*np.exp(-height / 6000),
                       taumol)
     # MOLEC = 0 version:
@@ -585,40 +585,66 @@ def snow_albedo_direct(angles, aerosol, atmosphere, snow, impurities):
     return snow
 
 
-#def spectral_toa_modelling(OLCI_scene, snow, angles):
-#    # calculation of gaseous transmittance at 620, 940, and 761nm:             
-#    # tt620 = OLCI_scene.toa.sel(7)  / snow["refl_direct"](7)
-#    tt761 = OLCI_scene.toa.sel(band=12) / snow["refl_direct"].sel(band=12)
-#    tt940 = OLCI_scene.toa.sel(band=19) / snow["refl_direct"].sel(band=19)
-#
-#    # calculation of gaseous vertical optical depth:         
-#    vodka = -np.log(tt620)/angles.inv_cos_za
-#		  
-#    # calculation of TOA reflectance at 620 nm
-#    r_toa_mod = ratm + t1t2 * r0 * snow["alb_sph"].sel(band=6) ** (u1 * u2 / r0) / (1 - snow["alb_sph"].sel(band=6) * albatm)
-#    tt620=OLCI_scene.toa.sel(band=6)/r_toa_mod
-#    tocos=vodka*9349.3
-#    abs620= 4.4871e-2
-#    r_toa_mod = OLCI_scene.toa * np.nan
-#    for jt in range(21):
-#        r_boa_mod.sel(band=jt) = OLCI_scene.toa.sel(band=jt) - f(snow["alb_sph"].sel(band=jt)/factor, 
-#                       atmosphere.t1t2, snow.r0, angles.u1, angles.u2, 
-#                       atmosphere.albatm, atmosphere.ratm, OLCI_scene.toa)
-#				
-#        tozone = t620 ** (cabsoz(jt) / abs620)
-#        TOX=1.
-#        TVODA=1.
-#        if (jt == 13): TOX= tt761**1.
-#        if (jt == 14): TOX= tt761**0.532
-#        if (jt == 15): TOX= tt761**0.074  
-#        if (jt == 19): TVODA=tt940**0.25
-#        if (jt == 20): TVODA=tt940**1.
-#        
-#        r_toa_mod.sel(band=jt) = r_boa_mod * TVODA * TOX * tozone
-#        if (BT < thv0): 
-#            r_toa_mod.sel(band=jt) = r_toa_mod.sel(band=jt) * factor
-#            
-#     (OLCI_scene.toa - r_toa_mod) ** 2
+def ozone_retrieval(OLCI_scene, snow, angles):
+    tt620 = OLCI_scene.toa.sel(band=6)  / snow.refl_direct.sel(band=6)
+    # calculation of gaseous vertical optical depth:         
+    vodka = -np.log(tt620)/angles.inv_cos_za
+    tocos = vodka * 9349.3
+    difoz = 100 * (tocos - OLCI_scene.ozone/2.1415e-5) / tocos
+    snow['tocos'] = tocos
+    snow['difoz'] = np.abs(difoz)
+    return snow
+
+
+def spectral_toa_modelling(OLCI_scene, snow, angles, atmosphere):
+    # snow reflectance at 620nm in absence of ozone absorption:
+    DARM = 4.*np.pi*8.58e-9/ (1.e-3*0.620)
+    reska = np.exp(-np.sqrt( DARM* snow.al))
+    rozone = snow.r0*np.exp(-(angles.u1*angles.u2/snow.r0) * np.sqrt( DARM* snow.al))
+    
+    # gaseous transmittance at 620nm:
+    TOAOZ = atmosphere.r.sel(band=6) + atmosphere.t1t2.sel(band=6) * rozone / (1. - reska * atmosphere.albatm.sel(band=6))
+    T620 = OLCI_scene.toa.sel(band=6)/TOAOZ
+    
+    # calculation of gaseous transmittance at 620, 940, and 761nm:             
+    tt761 = OLCI_scene.toa.sel(band=12) / snow.refl_direct.sel(band=12)
+    tt940 = OLCI_scene.toa.sel(band=19) / snow.refl_direct.sel(band=19)
+
+
+    # calculation of TOA reflectance at 620 nm
+    r_toa_mod = atmosphere.r + atmosphere.t1t2 * snow.r0 * snow.factor * (snow.alb_sph / snow.factor) ** (angles.u1 * angles.u2 / snow.r0) / (1 - (snow.alb_sph / snow.factor) * atmosphere.albatm)
+    
+    r_toa_mod = xr.where(snow.alb_sph > 0.05, r_toa_mod, 1)
+    
+    tt620 = OLCI_scene.toa.sel(band=6) / r_toa_mod.sel(band=6)
+    
+    abs620 = 4.4871e-2
+    tozone = T620 ** (cabsoz / abs620)
+
+    TOX = xr.ones_like(r_toa_mod)
+    TVODA = xr.ones_like(r_toa_mod)
+    TOX.loc[:,12]= (tt761**1).values
+    TOX.loc[:,13] = tt761**0.532
+    TOX.loc[:,14] = tt761**0.074 
+    TVODA.loc[:,18] = tt940**0.25
+    TVODA.loc[:,19] = tt940**1.
+    r_toa_mod = r_toa_mod * TVODA * TOX * tozone * snow.factor
+    
+    # calculating difference between modelled and observed r_TOA
+    band_list = np.arange(21)
+    SE = (OLCI_scene.toa.sel(band= band_list) - r_toa_mod.sel(band= band_list)) ** 2
+    RMSE = np.sqrt(SE.mean(dim='band'))
+    cv1 = 100 * RMSE / OLCI_scene.toa.mean(dim='band')
+
+    band_list = np.append(np.arange(12), np.array([15, 16, 17, 20]))
+    SE = (OLCI_scene.toa.sel(band= band_list) - r_toa_mod.sel(band= band_list)) ** 2
+    RMSE = np.sqrt(SE.mean(dim='band'))
+    cv2 = 100 * RMSE / OLCI_scene.toa.sel(band= band_list).mean(dim='band')
+    
+    snow['cv1'] = cv1
+    snow['cv2'] = cv2
+    return snow
+
     
 def compute_BBA(OLCI_scene, snow, angles, compute_polluted=True):
     # CalCULATION OF BBA of clean snow
@@ -985,7 +1011,7 @@ def zbrent(x0, x1, args=(), max_iter=100, tolerance=1e-12):
     return x1
 
 
-def process(OLCI_scene, compute_polluted=True, **kwargs):
+def process(OLCI_scene, compute_polluted=True, no_qc=False, no_oz=False, **kwargs):
     angles = view_geometry(OLCI_scene)
     OLCI_scene, snow = prepare_processing(OLCI_scene, angles, compute_polluted=compute_polluted)
     OLCI_scene, angles, snow = snow_properties(OLCI_scene, angles, snow)
@@ -1010,26 +1036,37 @@ def process(OLCI_scene, compute_polluted=True, **kwargs):
         impurities["aload_ppm"] = np.nan
 
     snow = compute_BBA(OLCI_scene, snow, angles, compute_polluted=compute_polluted)
+
+    if not no_oz:
+        snow = ozone_retrieval(OLCI_scene, snow, angles)
+    if not no_qc:
+        snow = spectral_toa_modelling(OLCI_scene, snow, angles, atmosphere)
     return snow
 
 
-def process_by_chunk(OLCI_scene, chunk_size=150000, compute_polluted=True):
+def process_by_chunk(OLCI_scene, chunk_size=150000, compute_polluted=True, no_qc=False, no_oz=False,):
     size = OLCI_scene.sza.shape[0]
     nchunks = int(max(np.floor(size / chunk_size), 1))
     OLCI_chunks = OLCI_scene.chunk({"band": 21, "xy": chunk_size})
     # snow_chunks = OLCI_chunks.map_blocks(process,kwargs={}, template = snow_template)
-    xy_chunk_indexes = np.array(OLCI_chunks.chunks["xy"]).cumsum()
+    xy_chunk_indexes = np.append(0, np.array(OLCI_chunks.chunks["xy"]).cumsum())
     
     snow = xr.Dataset()
 
     for i in range(len(xy_chunk_indexes) - 1):
-        print(f"{i+1} / {nchunks}")
+        print(f"{i+1} / {nchunks+1}")
         # define chunk
         chunk = OLCI_scene.isel(xy=slice(xy_chunk_indexes[i], xy_chunk_indexes[i + 1]))
-        # process chunk
-        snow_chunk = process(chunk)
         
-        if i == 0:
+        if chunk.sza.notnull().sum() == 0:
+            continue
+        # process chunk
+        snow_chunk = process(chunk, 
+                             compute_polluted=compute_polluted,
+                             no_qc=no_qc,
+                             no_oz=no_oz)
+        
+        if len(snow) == 0:
             snow = snow_chunk.copy()
         else:
             snow = xr.concat([snow, snow_chunk], dim="xy")
@@ -1039,16 +1076,25 @@ def process_by_chunk(OLCI_scene, chunk_size=150000, compute_polluted=True):
 
 
 def main():
-    # if the script is called from the command line, then parsing the input path and
-    # passing it to the main function
+    # debug:
+    # InputPath = '../data/5_km_res/'
+    # OutputFolder = '../data/5_km_res/pySICEv2.1_qc'
+    # import argparse
+    # args = argparse.ArgumentParser()
+    # args.clean_snow = False
+    # args.no_qc = False
+    # args.no_oz = False
+    
     args = parse_args(sys.argv[1:])
     InputPath = get_input_folder(args)
     OutputFolder = get_output_folder(args)
-    if args.clean_snow:
-        compute_polluted = False
+    if args.clean_snow: 
         print('Retrieving all pixels as clean snow')
-    else:
-        compute_polluted = True
+        args.no_qc = True
+        args.no_oz = True
+    if args.no_qc: print('No quality check')
+    if args.no_oz: print('No ozone retrieval')
+    
 
     print('Start pysice.py')
     print('Input folder:', InputPath)
@@ -1061,13 +1107,19 @@ def main():
     start_time = time.process_time()
 
     if len(OLCI_scene.xy)<1000000:
-        snow = process(OLCI_scene, compute_polluted=compute_polluted)
+        snow = process(OLCI_scene, 
+                       compute_polluted=not args.clean_snow,
+                       no_qc=args.no_qc,
+                       no_oz=args.no_oz)
     else:
-        snow = process_by_chunk(OLCI_scene, chunk_size=500000, compute_polluted=compute_polluted)
+        snow = process_by_chunk(OLCI_scene, 
+                                chunk_size=500000,
+                                compute_polluted=not args.clean_snow,
+                                no_qc=args.no_qc,
+                                no_oz=args.no_oz)
 
     duration = time.process_time() - start_time
     print("Time elapsed: ", duration)
-
     write_output(snow, OutputFolder)
 
 if __name__ == "__main__":
