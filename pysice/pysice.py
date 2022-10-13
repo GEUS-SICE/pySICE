@@ -1084,8 +1084,8 @@ def process(OLCI_scene, compute_polluted=True, no_qc=False, no_oz=False, **kwarg
     # retrieving snow impurities
     if compute_polluted:
         impurities = snow_impurities(snow)
-        for v in impurities.data_vars:  # copy impurities data to snow
-            snow[v] = impurities[v]
+        for v in list(impurities.keys()):  # copy impurities data to snow
+            snow[v] = impurities[v].drop_vars('band')
 
         snow = snow_albedo_direct(angles, aerosol, atmosphere, snow, impurities)
 
