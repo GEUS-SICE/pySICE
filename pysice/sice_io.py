@@ -124,7 +124,7 @@ class sice_io(object):
         self.original_width = rootgrp.dimensions['columns'].size
         self.original_height = rootgrp.dimensions['rows'].size
 
-    def open_satpy(self, x0=0, y0=0, width=None, height=None):
+    def open_satpy(self, x0=0, y0=0, width=None, height=None, with_geom=True):
         import satpy  # this is not good practice but avoid satpy to be a compulsary dependence
 
         filenames = glob(os.path.join(self.dirname, "*.nc"))
@@ -138,9 +138,8 @@ class sice_io(object):
             'satellite_zenith_angle': 'vza',
             'total_ozone': 'ozone',
             'altitude': 'elevation'
-            # 'longitude': 'longitude',
-            # 'latitude': 'latitude'
         }
+
         scene.load(list(variables.keys()))
 
         islice = {}
@@ -158,10 +157,15 @@ class sice_io(object):
             return data
 
         self.olci_scene = xr.Dataset()
+        if with_geom:
+            scene.load(['longitude', 'latitude'])
+            self.olci_scene = self.olci_scene.assign_coords(longitude=get_var('longitude'),
+                                                            latitude=get_var('latitude'))
         for variable in variables:
             self.olci_scene[variables[variable]] = get_var(variable)
 
         scene.unload()  # maybe useless
+
         coef = 1 / np.cos(np.deg2rad(self.olci_scene['sza'])) / 100.
 
         bands = [f'Oa{i:02}' for i in range(1, 22)]
@@ -183,7 +187,7 @@ class sice_io(object):
         self.original_width = len(ds.x)
         self.original_height = len(ds.y)
 
-    def open_zarr(self, x0=0, y0=0, width=None, height=None):
+    def open_zarr(self, x0=0, y0=0, width=None, height=None, with_geom=True):
 
         variables = {
             'solar_azimuth_angle': 'saa',
@@ -192,8 +196,6 @@ class sice_io(object):
             'satellite_zenith_angle': 'vza',
             'total_ozone': 'ozone',
             'altitude': 'elevation'
-            # 'longitude': 'longitude',
-            # 'latitude': 'latitude'
         }
 
         ds = xr.open_zarr(self.dirname)
@@ -204,11 +206,14 @@ class sice_io(object):
         if height is not None:
             islice['y'] = slice(y0, y0 + height)
 
-        self.olci_scene = xr.Dataset()
-
         def get_var(variable):
             # return the variable and remove what needs to be remove
             return ds[variable].isel(islice).stack(xy=("x", "y")).compute()
+
+        self.olci_scene = xr.Dataset()
+        if with_geom:
+            self.olci_scene['longitude'] = get_var('longitude')
+            self.olci_scene['latitude'] = get_var('latitude')
 
         for variable in variables:
             self.olci_scene[variables[variable]] = get_var(variable)
