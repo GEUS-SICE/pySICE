@@ -1024,16 +1024,12 @@ def process(OLCI_scene, compute_polluted=True, no_qc=False, no_oz=False, **kwarg
     # retrieving snow impurities
     if compute_polluted:
         impurities = snow_impurities(snow)
+        for v in impurities.data_vars:  # copy impurities data to snow
+            snow[v] = impurities[v]
 
         snow = snow_albedo_direct(
             angles, aerosol, atmosphere, snow, impurities
         )
-    else:
-        impurities = xr.Dataset()
-        impurities["ntype"] = np.nan
-        impurities["polut"] = np.nan
-        impurities["bm"] = np.nan
-        impurities["aload_ppm"] = np.nan
 
     snow = compute_BBA(OLCI_scene, snow, angles, compute_polluted=compute_polluted)
 
