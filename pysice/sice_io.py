@@ -14,6 +14,7 @@ import numpy as np
 import rioxarray
 import argparse
 import sys
+import pandas as pd
 
 try:
     import rasterio as rio
@@ -46,8 +47,34 @@ class sice_io(object):
         elif os.path.exists(os.path.join(dirname, "r_TOA_01.tif")):
             self._get_size_tif()
             self.open = self.open_tif
+
         else:
-            print("No tif, netcdf or zarr file found in ", dirname)
+
+            csv_list = [file for file in os.listdir(dirname) if file.endswith('.csv')]
+            if len(csv_list) == 1:
+                self.filepath = os.path.join(dirname, csv_list[0])
+                self.open = self.open_csv
+            else:
+                print("No tif, netcdf, csv or zarr file found in ", dirname)
+
+    def open_csv(self):
+        print(self.filepath)
+        df = pd.read_csv(self.filepath)
+        self.olci_scene = xr.Dataset(
+            {"toa": (("xy", "band"), 
+                     df[['Oa'+str(i).zfill(2) + '_reflectance' for i in range(1, 22)]].values),
+             "sza": (("xy"),  df['sza'].values),
+             "saa": (("xy"),  df['saa'].values),
+             "vza": (("xy"),  df['vza'].values),
+             "vaa": (("xy"),  df['vaa'].values),
+             "ozone": (("xy"),  df['total_ozone'].values),
+             "elevation": (("xy"),  df['elevation'].values),
+             },
+            coords={
+                "xy": np.arange(df.shape[0]),
+                "band": np.arange(0,21),
+            },
+        )
 
     def _open_tif(self, filename):
         return rio.open(os.path.join(self.dirname, filename))
@@ -58,29 +85,6 @@ class sice_io(object):
         self.original_height = self.meta["height"]
 
     def open_tif(self, x0=0, y0=0, width=None, height=None):
-
-        # if os.path.isfile(self.dirname):
-        #     raise NotImplementedError("this part needs to be cleaned")
-        #     InputFolder = os.path.dirname(os.path.dirname(dirname_or_filename)) + '/'
-        #     print('Text file input')
-        #     # data_in = pd.read_csv(sys.argv[1])
-        #     data_in = pd.read_csv(sys.argv[1])
-        #     self.toa = np.expand_dims(data_in[[c for c in data_in.columns if c.find('reflec') >= 0]].to_numpy().transpose(), axis=2)
-
-        #     self.ozone = np.expand_dims(data_in['total_ozone'], axis=1)
-        #     self.water = np.expand_dims(data_in['total_columnar_water_vapour'], axis=1)
-        #     self.sza = np.expand_dims(data_in['sza'], axis=1)
-        #     self.saa = np.expand_dims(data_in['saa'], axis=1)
-        #     self.vza = np.expand_dims(data_in['vza'], axis=1)
-        #     self.vaa = np.expand_dims(data_in['vaa'], axis=1)
-        #     self.height = np.expand_dims(data_in['altitude'], axis=1)
-
-        #     self.sza[np.isnan(toa[0, :, :])] = np.nan
-        #     self.saa[np.isnan(toa[0, :, :])] = np.nan
-        #     self.vza[np.isnan(toa[0, :, :])] = np.nan
-        #     self.vaa[np.isnan(toa[0, :, :])] = np.nan
-
-        # # %% ========= input tif ===============
         if not os.path.isdir(self.dirname):
             raise Exception("dirname must be a directory")
 
@@ -312,76 +316,74 @@ class sice_io(object):
             consolidated=True,
         )
 
-    # def to_csv(self):
-    #     # %% Output
-    #     print('\nText file output')
-    #     # data_in = pd.read_csv(sys.argv[1])
-    #     data_out = data_in
-    #     data_out['grain_diameter'] = self.diameter
-    #     # data_out['snow_specific_area']=area
-    #     data_out['al'] = self.al
-    #     data_out['r0'] = self.r0
-    #     data_out['diagnostic_retrieval'] = self.isnow
-    #     data_out['conc'] = self.conc
-    #     data_out['albedo_bb_planar_sw'] = self.rp3
-    #     data_out['albedo_bb_spherical_sw'] = self.rs3
-    #     for i in np.append(np.arange(11), np.arange(15,21)):
-    #     # for i in np.arange(21):
-    #         data_out['albedo_spectral_spherical_' + str(i + 1).zfill(2)] = self.alb_sph[i,:,:]
-    #     for i in np.append(np.arange(11), np.arange(15,21)):
-    #         data_out['rBRR_'+str(i+1).zfill(2)] = self.rp[i,:,:]
-    #     basename, ext = os.path.splitext(self.filename)
-    #        data_out.to_csv(basename + '_out.csv')
 
-
-def write_output(snow, OutputFolder):
-    file_name_list = {
-        "BXXX": "O3_SICE",
-        "diameter": "grain_diameter",
-        "area": "snow_specific_area",
-        "al": "al",
-        "r0": "r0",
-        "isnow": "isnow",
-        "conc": "conc",
-        "rp3": "albedo_bb_planar_sw",
-        "rs3": "albedo_bb_spherical_sw",
-        "factor": "factor",
-        "tocos": "03_SICE",
-        "cv1": "cv1",
-        "cv2": "cv2",
-        "difoz": "difoz",
-    }
-
-    def da_to_tif(da, file_path):
-        da = da.unstack(dim="xy").transpose("y", "x")
-        da.rio.to_raster(file_path, dtype="float32", compress="DEFLATE")
-
-    for var in [
-        "diameter",
-        "area",
-        "rp3",
-        "rs3",
-        "isnow",
-        "r0",
-        "al",
-        "factor",
-        "tocos",
-        "cv1",
-        "cv2",
-        "difoz",
-    ]:
-        if var in snow.keys():
-            da_to_tif(
-                snow[var], os.path.join(OutputFolder, file_name_list[var] + ".tif")
-            )
-
-    # da_to_tif(snow.alb_sph.sel(band=0), OutputFolder+'/alb_sph_01_solved.tif')
-    # da_to_tif(snow.rp.sel(band=0), OutputFolder+'/alb_pl_01_solved.tif')
-
-    # if 'alb_sph_direct' in list(snow.keys()):
-    #     da_to_tif(snow.alb_sph_direct.sel(band=0), OutputFolder+'/alb_sph_01.tif')
-    # if 'rp_direct' in list(snow.keys()):
-    #     da_to_tif(snow.rp_direct.sel(band=0), OutputFolder+'/alb_pl_01.tif')
+def write_output(snow, OutputFolder, filename):
+    if filename.endswith('.csv'):
+        print('\nText file output')
+        data_out = pd.DataFrame()
+        data_out['grain_diameter'] = snow.diameter.to_pandas()
+        data_out['snow_specific_area']= snow.area.to_pandas()
+        data_out['al'] = snow.al.to_pandas()
+        data_out['r0'] = snow.r0.to_pandas()
+        data_out['diagnostic_retrieval'] = snow.isnow.to_pandas()
+        # data_out['conc'] = snow.conc.to_pandas()
+        data_out['albedo_bb_planar_sw'] = snow.rp3.to_pandas()
+        data_out['albedo_bb_spherical_sw'] = snow.rs3.to_pandas()
+        # for i in np.append(np.arange(11), np.arange(15,21)):
+        # for i in np.arange(21):
+            # data_out['albedo_spectral_spherical_' + str(i + 1).zfill(2)] = snow.alb_sph[i,:,:]
+        # for i in np.append(np.arange(11), np.arange(15,21)):
+            # data_out['rBRR_'+str(i+1).zfill(2)] = snow.rp[i,:,:]
+        data_out.to_csv(OutputFolder + '/out.csv')
+        print(OutputFolder + '/out.csv')
+    else:
+        file_name_list = {
+            "BXXX": "O3_SICE",
+            "diameter": "grain_diameter",
+            "area": "snow_specific_area",
+            "al": "al",
+            "r0": "r0",
+            "isnow": "isnow",
+            "conc": "conc",
+            "rp3": "albedo_bb_planar_sw",
+            "rs3": "albedo_bb_spherical_sw",
+            "factor": "factor",
+            "tocos": "03_SICE",
+            "cv1": "cv1",
+            "cv2": "cv2",
+            "difoz": "difoz",
+        }
+    
+        def da_to_tif(da, file_path):
+            da = da.unstack(dim="xy").transpose("y", "x")
+            da.rio.to_raster(file_path, dtype="float32", compress="DEFLATE")
+    
+        for var in [
+            "diameter",
+            "area",
+            "rp3",
+            "rs3",
+            "isnow",
+            "r0",
+            "al",
+            "factor",
+            "tocos",
+            "cv1",
+            "cv2",
+            "difoz",
+        ]:
+            if var in snow.keys():
+                da_to_tif(
+                    snow[var], os.path.join(OutputFolder, file_name_list[var] + ".tif")
+                )
+    
+        # da_to_tif(snow.alb_sph.sel(band=0), OutputFolder+'/alb_sph_01_solved.tif')
+        # da_to_tif(snow.rp.sel(band=0), OutputFolder+'/alb_pl_01_solved.tif')
+    
+        # if 'alb_sph_direct' in list(snow.keys()):
+        #     da_to_tif(snow.alb_sph_direct.sel(band=0), OutputFolder+'/alb_sph_01.tif')
+        # if 'rp_direct' in list(snow.keys()):
+        #     da_to_tif(snow.rp_direct.sel(band=0), OutputFolder+'/alb_pl_01.tif')
 
 
 def get_parser():

@@ -208,8 +208,8 @@ def prepare_processing(OLCI_scene, angles, compute_polluted=True):
     # Filtering pixels unsuitable for retrieval
     snow = xr.Dataset()
     snow["isnow"] = OLCI_scene["sza"] * np.nan
-    snow["isnow"] = xr.where(OLCI_scene.toa[20] < 0.1, 102, snow.isnow)
-    snow["isnow"] = xr.where(OLCI_scene.toa[0] < 0.2, 103, snow.isnow)
+    snow["isnow"] = xr.where(OLCI_scene.toa.sel(band=20) < 0.1, 102, snow.isnow)
+    snow["isnow"] = xr.where(OLCI_scene.toa.sel(band=0) < 0.2, 103, snow.isnow)
     snow["isnow"] = xr.where(OLCI_scene.sza > 75, 100, snow.isnow)
     snow["isnow"] = xr.where(OLCI_scene["sza"].isnull(), 999, snow.isnow)
 
@@ -677,11 +677,11 @@ def spectral_toa_modelling(OLCI_scene, snow, angles, atmosphere):
 
     TOX = xr.ones_like(r_toa_mod)
     TVODA = xr.ones_like(r_toa_mod)
-    TOX.loc[:, 12] = (tt761 ** 1).values
-    TOX.loc[:, 13] = tt761 ** 0.532
-    TOX.loc[:, 14] = tt761 ** 0.074
-    TVODA.loc[:, 18] = tt940 ** 0.25
-    TVODA.loc[:, 19] = tt940 ** 1.0
+    TOX.loc[{'band': 12}] = (tt761 ** 1).values
+    TOX.loc[{'band': 13}] = tt761 ** 0.532
+    TOX.loc[{'band': 14}] = tt761 ** 0.074
+    TVODA.loc[{'band': 18}] = tt940 ** 0.25
+    TVODA.loc[{'band': 19}] = tt940 ** 1.0
     r_toa_mod = r_toa_mod * TVODA * TOX * tozone * snow.factor
 
     # calculating difference between modelled and observed r_TOA
@@ -1184,7 +1184,7 @@ def main():
 
     duration = time.process_time() - start_time
     print("Time elapsed: ", duration)
-    write_output(snow, OutputFolder)
+    write_output(snow, OutputFolder, OLCI_reader.filepath)
 
 
 if __name__ == "__main__":
