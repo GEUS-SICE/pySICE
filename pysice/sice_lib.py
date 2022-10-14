@@ -840,12 +840,12 @@ def BBA_calc_pol(alb, asol, sol1_pol, sol2, sol3_pol):
     alam8 = 1.02
 
     # input reflectances
-    r2 = alb.sel(band=0)
-    r3 = alb.sel(band=5)
-    r5 = alb.sel(band=10)
-    r6 = alb.sel(band=11)
-    r7 = alb.sel(band=16)
-    r8 = alb.sel(band=20)
+    r2 = alb[0, :]
+    r3 = alb[5, :]
+    r5 = alb[10, :]
+    r6 = alb[11, :]
+    r7 = alb[16, :]
+    r8 = alb[20, :]
 
     sa1, a1, b1, c1 = quad_func(alam2, alam3, alam5, r2, r3, r5)
     ajx1 = a1*sol1_pol
