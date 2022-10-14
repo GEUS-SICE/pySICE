@@ -48,7 +48,7 @@ class sice_io(object):
             self._get_size_tif()
             self.open = self.open_tif
             
-        elif dirname.endswith(".zarr"):
+        elif dirname.endswith(".csv"):
             self.filepath = dirname
             self.open = self.open_csv
         else:
