@@ -73,9 +73,15 @@
 # funp                      snow spectral planar and spherical albedo function
 
 import numpy as np
-import sice_lib as sl
 import sys
-from sice_io import sice_io, write_output
+try:
+    import sice_lib as sl
+    from sice_io import sice_io, write_output
+except ImportError:
+    # caution: path[0] is reserved for script path (or '' in REPL)
+    sys.path.insert(1, './pysice')
+    import sice_lib as sl
+    from sice_io import sice_io, write_output
 import time
 
 np.seterr(invalid='ignore')
@@ -104,4 +110,4 @@ if __name__ == '__main__':
     duration = time.process_time() - start_time
     print('Time elapsed: ', duration)
 
-    write_output(snow, OutputFolder)
+    write_output(snow, OutputFolder, OLCI_reader.dirname)

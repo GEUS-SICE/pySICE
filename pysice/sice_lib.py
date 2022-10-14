@@ -96,9 +96,12 @@ import xarray as xr
 import numpy as np
 import numba
 
-from .constants_optim import wls, bai, xa, ya, f0, f1, f2, bet, gam, coef1, coef2, coef3, coef4
-from .constants_optim import sol1_clean, sol2, sol3_clean, sol1_pol, sol3_pol, asol, bandcoord
-
+try: 
+    from .constants_optim import wls, bai, xa, ya, f0, f1, f2, bet, gam, coef1, coef2, coef3, coef4
+    from .constants_optim import sol1_clean, sol2, sol3_clean, sol1_pol, sol3_pol, asol, bandcoord
+except ImportError:
+    from constants_optim import wls, bai, xa, ya, f0, f1, f2, bet, gam, coef1, coef2, coef3, coef4
+    from constants_optim import sol1_clean, sol2, sol3_clean, sol1_pol, sol3_pol, asol, bandcoord
 os.environ['PYTROLL_CHUNK_SIZE'] = '256'
 
 
@@ -177,7 +180,10 @@ def ozone_correction(OLCI_scene, write_ozone=False):
     # water and ozone spectral optical density
     # water_vod = genfromtxt('./tg_water_vod.dat', delimiter='   ')
     # self.voda = xr.DataArray(water_vod[0:21, 1], coords=[bandcoord])
-    datadir = os.path.join(os.path.dirname(__file__), "data")
+    try:
+        datadir = os.path.join(os.path.dirname(__file__), "data")
+    except:
+        datadir = '.\pysice\data'
     ozone_vod = np.genfromtxt(os.path.join(datadir, 'tg_vod.dat'), delimiter='   ')
     tozon = xr.DataArray(ozone_vod[0:21, 1], coords=[bandcoord])
 
@@ -217,8 +223,8 @@ def molecular_absorption(ozone, tozon, sza, vza, toa):
 def prepare_processing(OLCI_scene):
     # Filtering pixels unsuitable for retrieval
     snow = xr.Dataset()
-    snow['isnow'] = xr.where(OLCI_scene.toa[20] < 0.1, 102, np.nan)
-    snow.isnow[OLCI_scene.sza > 75] = 100
+    snow['isnow'] = xr.where(OLCI_scene.toa.sel(band=20) < 0.1, 102, np.nan)
+    snow['isnow'] = xr.where(OLCI_scene.sza > 75, 100, snow['isnow'])
 
     mask = np.isnan(snow.isnow)
     OLCI_scene['toa'] = OLCI_scene.toa.where(mask)
@@ -295,7 +301,7 @@ def snow_properties(OLCI_scene, angles, snow):
     diameter_thresh = 0.01
 
     valid = D >= diameter_thresh
-    snow.isnow[~valid & np.isnan(snow.isnow)] = 104
+    snow['isnow'] = xr.where(~valid & np.isnan(snow.isnow), 104, snow['isnow'])
     OLCI_scene['toa'] = OLCI_scene.toa.where(valid)
     snow['diameter'] = D.where(valid)
     snow['area'] = area.where(valid)
@@ -307,13 +313,17 @@ def snow_properties(OLCI_scene, angles, snow):
 
 
 def prepare_coef(aerosol, angles):
-
-    otherdims = tuple([d for d in aerosol.tau.dims if d != 'band'])
-    inputdims = [('band',) + otherdims] * 3 + [otherdims] * 3
-    outputdims = [('band',) + otherdims] * 4
+    # otherdims = tuple([d for d in aerosol.tau.dims if d != 'band'])
+    # inputdims = [('band',) + otherdims] * 3 + [otherdims] * 3
+    # outputdims = [('band',) + otherdims] * 4
 
     args = aerosol.tau, aerosol.g, aerosol.p, angles.cos_sza, angles.cos_vza, angles.inv_cos_za
-    t1, t2, ratm, r = xr.apply_ufunc(prepare_coef_numpy, *args, input_core_dims=inputdims, output_core_dims=outputdims)
+    inputdims = tuple([d.dims for d in args])
+    outputdims = [aerosol.tau.dims, aerosol.tau.dims, aerosol.tau.dims, aerosol.tau.dims]
+    t1, t2, ratm, r = xr.apply_ufunc(prepare_coef_numpy,
+                                     *args,
+                                     input_core_dims=inputdims,
+                                     output_core_dims=outputdims)
 
     atmosphere = xr.Dataset()
     atmosphere['t1'] = t1
@@ -428,7 +438,7 @@ def polluted_snow_albedo(OLCI_scene, angles, aerosol, atmosphere, snow):
     snow.isnow[snow.ind_pol] = 1
     #  very dirty snow
     ind_very_dark = (OLCI_scene.toa.sel(band=20) < 0.4) & snow.ind_pol
-    snow.isnow[ind_very_dark] = 6
+    snow['isnow'] = xr.where(ind_very_dark, 6, snow.isnow)
 
     def compute_rclean(cos_sza, cos_vza, cos_sa, raa):
         am11 = np.sqrt(1.-cos_sza**2.)
@@ -473,7 +483,7 @@ def polluted_snow_albedo(OLCI_scene, angles, aerosol, atmosphere, snow):
             atmosphere.r.sel(band=i_channel)[iind_pol]
         )
         ind_bad = snow.alb_sph.sel(band=i_channel) == -999
-        snow.isnow[ind_bad] = -i_channel
+        snow['isnow' ] = xr.where(ind_bad, -i_channel, snow.isnow)
     snow['alb_sph'] = snow.alb_sph.where(snow.isnow >= 0)
 
     # INTERNal CHECK FOR CLEAN PIXELS
@@ -830,12 +840,12 @@ def BBA_calc_pol(alb, asol, sol1_pol, sol2, sol3_pol):
     alam8 = 1.02
 
     # input reflectances
-    r2 = alb[0, :]
-    r3 = alb[5, :]
-    r5 = alb[10, :]
-    r6 = alb[11, :]
-    r7 = alb[16, :]
-    r8 = alb[20, :]
+    r2 = alb.sel(band=0)
+    r3 = alb.sel(band=5)
+    r5 = alb.sel(band=10)
+    r6 = alb.sel(band=11)
+    r7 = alb.sel(band=16)
+    r8 = alb.sel(band=20)
 
     sa1, a1, b1, c1 = quad_func(alam2, alam3, alam5, r2, r3, r5)
     ajx1 = a1*sol1_pol
