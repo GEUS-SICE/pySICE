@@ -47,7 +47,10 @@ class sice_io(object):
         elif os.path.exists(os.path.join(dirname, "r_TOA_01.tif")):
             self._get_size_tif()
             self.open = self.open_tif
-
+            
+        elif dirname.endswith(".zarr"):
+            self.filepath = dirname
+            self.open = self.open_csv
         else:
 
             csv_list = [file for file in os.listdir(dirname) if file.endswith('.csv')]
@@ -55,7 +58,7 @@ class sice_io(object):
                 self.filepath = os.path.join(dirname, csv_list[0])
                 self.open = self.open_csv
             else:
-                print("No tif, netcdf, csv or zarr file found in ", dirname)
+                print("No tif, netcdf, (unique) csv or zarr file found in ", dirname)
 
     def open_csv(self):
         print(self.filepath)
@@ -145,7 +148,7 @@ class sice_io(object):
         self.original_width = rootgrp.dimensions["columns"].size
         self.original_height = rootgrp.dimensions["rows"].size
 
-    def open_satpy(self, x0=0, y0=0, width=None, height=None):
+    def open_satpy(self, x0=0, y0=0, width=None, height=None, with_geom=True):
         import satpy  # this is not good practice but avoid satpy to be a compulsary dependence
 
         filenames = glob(os.path.join(self.dirname, "*.nc"))
@@ -153,50 +156,53 @@ class sice_io(object):
         scene = satpy.Scene(reader="olci_l1b", filenames=filenames)
 
         variables = {
-            "solar_azimuth_angle": "saa",
-            "solar_zenith_angle": "sza",
-            "satellite_azimuth_angle": "vaa",
-            "satellite_zenith_angle": "vza",
-            "total_ozone": "ozone",
-            "altitude": "elevation"
-            # 'longitude': 'longitude',
-            # 'latitude': 'latitude'
+            'solar_azimuth_angle': 'saa',
+            'solar_zenith_angle': 'sza',
+            'satellite_azimuth_angle': 'vaa',
+            'satellite_zenith_angle': 'vza',
+            'total_ozone': 'ozone',
+            'altitude': 'elevation'
         }
+
         scene.load(list(variables.keys()))
 
         islice = {}
         if width is not None:
-            islice["x"] = slice(x0, x0 + width)
+            islice['x'] = slice(x0, x0 + width)
         if height is not None:
-            islice["y"] = slice(y0, y0 + height)
+            islice['y'] = slice(y0, y0 + height)
 
         def get_var(variable):
             # return the variable and remove what needs to be remove
             data = scene[variable].isel(islice).compute().stack(xy=("x", "y"))
-            data.attrs = (
-                {}
-            )  # remove attributes, due to some conflict with tà_zarr being unable to serialize datatime
-            if "crs" in data.coords:
-                del data.coords["crs"]  # idem. zarr complains
+            data.attrs = {}  # remove attributes, due to some conflict with tà_zarr being unable to serialize datatime
+            if 'crs' in data.coords:
+                del data.coords['crs']  # idem. zarr complains
             return data
 
+        self.olci_scene = xr.Dataset()
+        if with_geom:
+            scene.load(['longitude', 'latitude'])
+            self.olci_scene = self.olci_scene.assign_coords(longitude=get_var('longitude'),
+                                                            latitude=get_var('latitude'))
         for variable in variables:
-            setattr(self, variables[variable], get_var(variable))
-        scene.unload()  # maybe useless
-        coef = 1 / np.cos(np.deg2rad(self.sza)) / 100.0
+            self.olci_scene[variables[variable]] = get_var(variable)
 
-        bands = [f"Oa{i:02}" for i in range(1, 22)]
+        scene.unload()  # maybe useless
+
+        coef = 1 / np.cos(np.deg2rad(self.olci_scene['sza'])) / 100.
+
+        bands = [f'Oa{i:02}' for i in range(1, 22)]
         scene.load(bands)
 
-        scene.load(
-            [satpy.DataQuery(name=band, calibration="reflectance") for band in bands]
-        )
-        self.toa = []
+        scene.load([satpy.DataQuery(name=band, calibration='reflectance') for band in bands])
+        toa = []
         for band in bands:
-            self.toa.append(np.clip(get_var(band) * coef, 0, 1))
-        self.toa = xr.concat(self.toa, dim="band")
-        if "crs" in self.toa.coords:
-            del self.toa.coords["crs"]  # idem. zarr complains
+            toa.append(np.clip(get_var(band) * coef, 0, 1))
+        self.olci_scene['toa'] = xr.concat(toa, dim='band')
+
+        if 'crs' in self.olci_scene['toa'].coords:
+            del self.olci_scene['toa'].coords['crs']  # idem. zarr complains
 
         scene.unload()  # probably useless
 
@@ -205,39 +211,42 @@ class sice_io(object):
         self.original_width = len(ds.x)
         self.original_height = len(ds.y)
 
-    def open_zarr(self, x0=0, y0=0, width=None, height=None):
+    def open_zarr(self, x0=0, y0=0, width=None, height=None, with_geom=True):
 
         variables = {
-            "solar_azimuth_angle": "saa",
-            "solar_zenith_angle": "sza",
-            "satellite_azimuth_angle": "vaa",
-            "satellite_zenith_angle": "vza",
-            "total_ozone": "ozone",
-            "altitude": "elevation"
-            # 'longitude': 'longitude',
-            # 'latitude': 'latitude'
+            'solar_azimuth_angle': 'saa',
+            'solar_zenith_angle': 'sza',
+            'satellite_azimuth_angle': 'vaa',
+            'satellite_zenith_angle': 'vza',
+            'total_ozone': 'ozone',
+            'altitude': 'elevation'
         }
 
         ds = xr.open_zarr(self.dirname)
 
         islice = {}
         if width is not None:
-            islice["x"] = slice(x0, x0 + width)
+            islice['x'] = slice(x0, x0 + width)
         if height is not None:
-            islice["y"] = slice(y0, y0 + height)
+            islice['y'] = slice(y0, y0 + height)
 
         def get_var(variable):
             # return the variable and remove what needs to be remove
             return ds[variable].isel(islice).stack(xy=("x", "y")).compute()
 
-        for variable in variables:
-            setattr(self, variables[variable], get_var(variable))
+        self.olci_scene = xr.Dataset()
+        if with_geom:
+            self.olci_scene['longitude'] = get_var('longitude')
+            self.olci_scene['latitude'] = get_var('latitude')
 
-        bands = [f"Oa{i:02}" for i in range(1, 22)]
-        self.toa = []
+        for variable in variables:
+            self.olci_scene[variables[variable]] = get_var(variable)
+
+        bands = [f'Oa{i:02}' for i in range(1, 22)]
+        toa = []
         for band in bands:
-            self.toa.append(get_var(band))
-        self.toa = xr.concat(self.toa, dim="band")
+            toa.append(get_var(band))
+        self.olci_scene['toa'] = xr.concat(toa, dim='band')
 
     def to_geotif(self, extended_output=False, save_spectral=False):
         def write_output(var, var_name, in_folder, meta):
