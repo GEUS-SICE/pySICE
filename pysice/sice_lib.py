@@ -109,7 +109,7 @@ def process(OLCI_scene, compute_polluted=True, **kwargs):
     angles = view_geometry(OLCI_scene)
     OLCI_scene = ozone_correction(OLCI_scene)
     OLCI_scene, snow = prepare_processing(OLCI_scene)
-    aerosol = aerosol_properties(OLCI_scene.elevation, angles.cos_sa, aot=0.1)
+    aerosol = aerosol_properties(OLCI_scene.elevation, angles.cos_sa, OLCI_scene.aot, OLCI_scene.aer_ang)
     OLCI_scene, angles, snow = snow_properties(OLCI_scene, angles, snow)
     atmosphere = prepare_coef(aerosol, angles)
     OLCI_scene, snow = clean_snow_albedo(OLCI_scene, angles, aerosol, atmosphere, snow)
@@ -125,23 +125,24 @@ def process_by_chunk(OLCI_scene, chunk_size=150000, compute_polluted=True):
     nchunks = int(max(np.floor(size / chunk_size), 1))
     OLCI_chunks = OLCI_scene.chunk({"band": 21, "xy": chunk_size})
     # snow_chunks = OLCI_chunks.map_blocks(process,kwargs={}, template = snow_template)
-    xy_chunk_indexes = np.array(OLCI_chunks.chunks["xy"]).cumsum()
+    xy_chunk_indexes = np.append(0, np.array(OLCI_chunks.chunks["xy"]).cumsum())
     
     snow = xr.Dataset()
 
     for i in range(len(xy_chunk_indexes) - 1):
-        print(f"{i+1} / {nchunks}")
+        print(f"{i+1} / {nchunks+1}")
         # define chunk
         chunk = OLCI_scene.isel(xy=slice(xy_chunk_indexes[i], xy_chunk_indexes[i + 1]))
+        if chunk.sza.notnull().sum() == 0:
+            continue
         # process chunk
         snow_chunk = process(chunk)
-        
-        if i == 0:
+
+        if len(snow) == 0:
             snow = snow_chunk.copy()
         else:
             snow = xr.concat([snow, snow_chunk], dim="xy")
         del snow_chunk
-
     return snow
 
 
@@ -237,9 +238,9 @@ def prepare_processing(OLCI_scene):
     return OLCI_scene, snow
 
 
-def aerosol_properties(height, cos_sa, aot=0.1):
+def aerosol_properties(height, cos_sa, aot, ang):
     # Atmospheric optical thickness
-    tauaer = aot * (wls / 0.5)**(-1.3)
+    tauaer = (aot * (wls / 0.5)**(-ang)).transpose()
 
     g0 = 0.5263
     g1 = 0.4627

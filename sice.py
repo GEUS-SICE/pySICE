@@ -104,8 +104,10 @@ if __name__ == '__main__':
 
     start_time = time.process_time()
 
-    snow = sl.process(OLCI_scene)
-    # snow = sl.process_by_chunk(OLCI_scene, chunk_size=500000)
+    if len(OLCI_scene.xy) < 1000000:
+        snow = sl.process(OLCI_scene)
+    else:
+        snow = sl.process_by_chunk(OLCI_scene, chunk_size=500000)
 
     duration = time.process_time() - start_time
     print('Time elapsed: ', duration)

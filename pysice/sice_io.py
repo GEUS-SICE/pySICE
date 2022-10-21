@@ -115,6 +115,16 @@ class sice_io(object):
         self.olci_scene['vaa'] = read_tif('OAA.tif')
         self.olci_scene['elevation'] = read_tif('height.tif').astype(np.float64)
 
+        try:
+            self.olci_scene['aot'] = read_tif('AOD_550.tif')
+            self.olci_scene['aer_ang'] = read_tif('ANG.tif')
+            print('Reading aerosol properties from file')
+        except:
+            self.olci_scene['aot'] = self.olci_scene['sza'] * 0 + 0.1
+            self.olci_scene['aer_ang'] = self.olci_scene['sza'] * 0 + 1.3
+            print('Default aerosol properties (AOT=0.1)')
+            pass
+
         mask = ~np.isnan(self.olci_scene.toa.sel(band=0))
         self.olci_scene = self.olci_scene.where(mask)
 
