@@ -1,7 +1,7 @@
-# pySICEv2.0
+# pySICEv2.1
 #
-# from FORTRAN VERSION 6.2
-# Apr. 2022
+# from FORTRAN VERSION 6.4
+# Sept. 2022
 #
 # This code retrieves snow/ice  albedo and related snow products for clean Arctic
 # atmosphere. The errors increase with the load of pollutants in air.

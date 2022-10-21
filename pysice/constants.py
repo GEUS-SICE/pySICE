@@ -10,7 +10,153 @@ import pandas as pd
 
 bandcoord = ("band", np.arange(21))
 
-# ICE REFRATIVE INDEX
+# OLCI channels
+wls = xr.DataArray(
+    [
+        0.4000e00,
+        0.4125e00,
+        0.4425e00,
+        0.4900e00,
+        0.5100e00,
+        0.5600e00,
+        0.6200e00,
+        0.6650e00,
+        0.6737e00,
+        0.6812e00,
+        0.7088e00,
+        0.7538e00,
+        0.7613e00,
+        0.7644e00,
+        0.7675e00,
+        0.7788e00,
+        0.8650e00,
+        0.8850e00,
+        0.9000e00,
+        0.9400e00,
+        0.1020e01,
+    ],
+    coords=[bandcoord],
+)
+
+# Imaginary part of ice refrative index at OLCI channels
+bai = xr.DataArray(
+    [
+        6.27e-10,
+        5.78e-10,
+        6.49e-10,
+        1.08e-9,
+        1.46e-9,
+        3.35e-09,
+        8.58e-09,
+        1.78e-08,
+        1.95e-08,
+        2.1e-08,
+        3.3e-08,
+        6.23e-08,
+        7.1e-08,
+        7.68e-08,
+        8.13e-08,
+        9.88e-08,
+        2.4e-07,
+        3.64e-07,
+        4.2e-07,
+        5.53e-07,
+        2.25e-06,
+    ],
+    coords=[bandcoord],
+)
+
+
+# BULK ice absorption coefficient at all OLCI channels  (1/nm)
+alpha = 4 * np.pi * bai / wls
+
+
+# ozone vertical optical density  at OLCI channels
+cabsoz = xr.DataArray(
+    [
+        1.3782e-4,
+        3.0488e-4,
+        1.6457e-3,
+        8.9359e-3,
+        1.7505e-2,
+        4.3471e-2,
+        4.4871e-2,
+        2.1016e-2,
+        1.7162e-2,
+        1.4663e-2,
+        7.9830e-3,
+        3.8797e-3,
+        2.9338e-3,
+        2.7992e-3,
+        2.7297e-3,
+        3.2560e-3,
+        8.9569e-4,
+        5.1888e-4,
+        6.7158e-4,
+        3.1278e-4,
+        1.4088e-5,
+    ],
+    coords=[bandcoord],
+)
+
+# relative vertical optical density of ozone f at all OLCI channels
+# (normalized to that at 620nm)
+# f = cabsoz/cabsoz.isel(band=6)
+
+# new constants defined by Alex
+# aerosol properties(aot=aot500nm,ANNA=Angström exponent)
+aot = 0.07
+anna = 1.3
+# MOLEC=0,1 - two versions of molecular optical thickness
+molec = 0
+jend = 100  # number of pixels to be printed (with spectral data)
+# patchy snow threshold for the channel R(400nm)
+thv0 = 0.75
+# threshold for the measured and simulated spectra differences
+thv1 = 10.0
+# threshold for the grain diameter
+thv2 = 0.07
+# threshold for the total ozone column retrieved
+thv3 = 1000.0
+
+
+# %% Solar flux
+# solar spectrum constants
+f0 = 32.38
+f1 = -160140.33
+f2 = 7959.53
+bet = 11.72  # 1.0 / 0.08534
+gam = 2.49  # 1.0 / 0.40179
+
+
+def sol(x):
+    # antiderivative of the SOLAR SPECTRUM at GROUND level
+    # Inputs:
+    # x         wave length in micrometer
+    # Outputs:
+    # sol       solar spectrum in W m-2 micrometer-1 (?)
+    # if (x < 0.4):
+    #         x=0.4
+    sol1a = f0 * x
+    sol1b = -f1 * np.exp(-bet * x) / bet
+    sol1c = -f2 * np.exp(-gam * x) / gam
+    return sol1a + sol1b + sol1c
+
+
+# solar flux calculation
+# sol1      visible(0.3-0.7micron)
+# Update 2022: same for clean and polluted
+sol_vis = sol(0.7) - sol(0.33)
+# sol2      near-infrared (0.7-2.4micron)
+# Update 2022: same for clean and polluted
+sol_nir = sol(2.4) - sol(0.7)
+# sol3      shortwave(0.3-2.4 micron)
+sol_sw = sol_vis + sol_nir
+
+# asol specific band
+asol = sol(0.865) - sol(0.7)
+
+# %% ICE REFRATIVE INDEX
 xa = np.array(
     [
         0.32,
@@ -414,149 +560,3 @@ ya = np.array(
         7.53000000e-04,
     ]
 )
-
-# OLCI channels
-wls = xr.DataArray(
-    [
-        0.4000e00,
-        0.4125e00,
-        0.4425e00,
-        0.4900e00,
-        0.5100e00,
-        0.5600e00,
-        0.6200e00,
-        0.6650e00,
-        0.6737e00,
-        0.6812e00,
-        0.7088e00,
-        0.7538e00,
-        0.7613e00,
-        0.7644e00,
-        0.7675e00,
-        0.7788e00,
-        0.8650e00,
-        0.8850e00,
-        0.9000e00,
-        0.9400e00,
-        0.1020e01,
-    ],
-    coords=[bandcoord],
-)
-
-# Imaginary part of ice refrative index at OLCI channels
-bai = xr.DataArray(
-    [
-        6.27e-10,
-        5.78e-10,
-        6.49e-10,
-        1.08e-9,
-        1.46e-9,
-        3.35e-09,
-        8.58e-09,
-        1.78e-08,
-        1.95e-08,
-        2.1e-08,
-        3.3e-08,
-        6.23e-08,
-        7.1e-08,
-        7.68e-08,
-        8.13e-08,
-        9.88e-08,
-        2.4e-07,
-        3.64e-07,
-        4.2e-07,
-        5.53e-07,
-        2.25e-06,
-    ],
-    coords=[bandcoord],
-)
-
-
-# BULK ice absorption coefficient at all OLCI channels  (1/nm)
-alpha = 4 * np.pi * bai / wls
-
-
-# ozone vertical optical density  at OLCI channels
-cabsoz = xr.DataArray(
-    [
-        1.3782e-4,
-        3.0488e-4,
-        1.6457e-3,
-        8.9359e-3,
-        1.7505e-2,
-        4.3471e-2,
-        4.4871e-2,
-        2.1016e-2,
-        1.7162e-2,
-        1.4663e-2,
-        7.9830e-3,
-        3.8797e-3,
-        2.9338e-3,
-        2.7992e-3,
-        2.7297e-3,
-        3.2560e-3,
-        8.9569e-4,
-        5.1888e-4,
-        6.7158e-4,
-        3.1278e-4,
-        1.4088e-5,
-    ],
-    coords=[bandcoord],
-)
-
-# relative vertical optical density of ozone f at all OLCI channels
-# (normalized to that at 620nm)
-# f = cabsoz/cabsoz.isel(band=6)
-
-# new constants defined by Alex
-# aerosol properties(aot=aot500nm,ANNA=Angström exponent)
-aot = 0.07
-anna = 1.3
-# MOLEC=0,1 - two versions of molecular optical thickness
-molec = 0
-jend = 100  # number of pixels to be printed (with spectral data)
-# patchy snow threshold for the channel R(400nm)
-thv0 = 0.5
-# threshold for the measured and simulated spectra differences
-thv1 = 10.0
-# threshold for the grain diameter
-thv2 = 0.07
-# threshold for the total ozone column retrieved
-thv3 = 1000.0
-
-
-# %% Solar flux
-# solar spectrum constants
-f0 = 32.38
-f1 = -160140.33
-f2 = 7959.53
-bet = 11.72  # 1.0 / 0.08534
-gam = 2.49  # 1.0 / 0.40179
-
-
-def sol(x):
-    # antiderivative of the SOLAR SPECTRUM at GROUND level
-    # Inputs:
-    # x         wave length in micrometer
-    # Outputs:
-    # sol       solar spectrum in W m-2 micrometer-1 (?)
-    # if (x < 0.4):
-    #         x=0.4
-    sol1a = f0 * x
-    sol1b = -f1 * np.exp(-bet * x) / bet
-    sol1c = -f2 * np.exp(-gam * x) / gam
-    return sol1a + sol1b + sol1c
-
-
-# solar flux calculation
-# sol1      visible(0.3-0.7micron)
-# Update 2022: same for clean and polluted
-sol_vis = sol(0.7) - sol(0.33)
-# sol2      near-infrared (0.7-2.4micron)
-# Update 2022: same for clean and polluted
-sol_nir = sol(2.4) - sol(0.7)
-# sol3      shortwave(0.3-2.4 micron)
-sol_sw = sol_vis + sol_nir
-
-# asol specific band
-asol = sol(0.865) - sol(0.7)
