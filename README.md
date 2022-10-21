@@ -68,7 +68,7 @@ Input files:
 
 
 | Diagnostic Code | Description                                                                                   |
-|-----------------+-----------------------------------------------------------------------------------------------|
+|-----------------|-----------------------------------------------------------------------------------------------|
 |               0 | clean snow                                                                                    |
 |               1 | polluted snow                                                                                 |
 |               6 | polluted snow for which r0 was calculated and not derived from observations                   |
