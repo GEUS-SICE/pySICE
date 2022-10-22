@@ -293,9 +293,9 @@ def snow_properties(OLCI_scene, angles, snow):
     return OLCI_scene, angles, snow
 
 
-def aerosol_properties(height, cos_sa, aot=0.07):
+def aerosol_properties(height, cos_sa, aot, aer_ang):
     # Atmospheric optical thickness
-    tauaer = aot * (wls / 0.5) ** (-1.3)
+    tauaer = (aot * (wls / 0.5) ** (-aer_ang)).transpose()
     # gaer = g0 + g1 * np.exp(-wls / wave0)
     gaer = 0.5263 + 0.4627 * np.exp(-wls / 0.4685)
     pr = 0.75 * (1.0 + cos_sa ** 2)
@@ -351,13 +351,14 @@ def prepare_coef(aerosol, angles):
         aerosol.tauaer,
     )
     inputdims = tuple([d.dims for d in args])
-    outputdims = [aerosol.tau.dims, aerosol.tau.dims, aerosol.tau.dims]
+    outputdims = [aerosol.tau.dims, aerosol.tauaer.dims, aerosol.tau.dims]
     t1t2, albatm, r = xr.apply_ufunc(
         prepare_coef_numpy,
         *args,
         input_core_dims=inputdims,
         output_core_dims=outputdims,
     )
+
     # t1t2, albatm, r = prepare_coef_xarray(
     #     aerosol.tau,
     #     aerosol.g,
@@ -369,6 +370,7 @@ def prepare_coef(aerosol, angles):
     #     aerosol.taumol,
     #     aerosol.tauaer,
     # )
+
     atmosphere = xr.Dataset()
     atmosphere["t1t2"] = t1t2
     atmosphere["albatm"] = albatm
@@ -403,7 +405,7 @@ def prepare_coef_numpy(tau, g, p, cos_sza, cos_vza, inv_cos_za, gaer, taumol, ta
     Baer[gaer >= 0.001] = (
         (1 - gaer) * ((1 + gaer) / np.sqrt(1.0 + gaer ** 2) - 1) / 2 / gaer
     )
-    B = (0.5 * taumol + np.expand_dims(Baer * tauaer, -1)) / tau
+    B = (0.5 * taumol +(Baer * tauaer.transpose()).transpose()) / tau
     t1t2 = np.exp(-B * tau / cos_sza) * np.exp(-B * tau / cos_vza)
 
     # atmospheric spherical albedo (updated 2022)
@@ -1073,7 +1075,12 @@ def process(OLCI_scene, compute_polluted=True, no_qc=False, no_oz=False, **kwarg
         OLCI_scene, angles, compute_polluted=compute_polluted
     )
     OLCI_scene, angles, snow = snow_properties(OLCI_scene, angles, snow)
-    aerosol = aerosol_properties(OLCI_scene.elevation, angles.cos_sa, aot=0.07)
+    if 'aot' not in OLCI_scene.keys():
+        print('Using default AOT value')
+        OLCI_scene['aot'] = OLCI_scene.sza*0 + 0.07
+        OLCI_scene['aer_ang'] = OLCI_scene.sza*0 + 1.3
+        
+    aerosol = aerosol_properties(OLCI_scene.elevation, angles.cos_sa, OLCI_scene.aot, OLCI_scene.aer_ang)
     atmosphere = prepare_coef(aerosol, angles)
 
     # first guess for the snow spherical albedo

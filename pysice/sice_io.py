@@ -135,7 +135,13 @@ class sice_io(object):
         self.olci_scene["vza"] = read_tif("OZA.tif")
         self.olci_scene["vaa"] = read_tif("OAA.tif")
         self.olci_scene["elevation"] = read_tif("height.tif").astype(np.float64)
-
+        try:
+            self.olci_scene['aot'] = read_tif('AOD_550.tif').fillna(0.07)
+            self.olci_scene['aer_ang'] = read_tif('ANG.tif').fillna(1.3)
+            print('Reading aerosol properties from file')
+        except:
+            pass
+            
         mask = ~np.isnan(self.olci_scene.toa.sel(band=0))
         self.olci_scene = self.olci_scene.where(mask)
         t = self.olci_scene.toa.unstack("xy")
