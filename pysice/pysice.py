@@ -470,8 +470,8 @@ def snow_albedo_solved(
     # Update 2022: for all pixels!
     snow["alb_sph"] = OLCI_scene.toa * np.nan
     ind_solved = snow.r0.notnull()
-    iind_solved = dict(xy=np.arange(len(ind_solved))[ind_solved])
-    snow.alb_sph[iind_solved] = 1
+    iind_solved = dict(xy=np.arange(len(ind_solved))[ind_solved.values])
+    snow.alb_sph.loc[iind_solved] = 1
 
     def solver_wrapper(toa, tau, t1t2, r0, u1, u2, albatm, r):
         # it is assumed that albedo is in the range 0.1-1.0
@@ -754,7 +754,7 @@ def compute_BBA(OLCI_scene, snow, angles, compute_polluted=True):
     if compute_polluted:
         # calculation of the BBA for the polluted snow
         ind_pol = (snow.isnow == 2) | (snow.isnow == 3)
-        iind_pol = dict(xy=np.arange(len(ind_pol))[ind_pol])
+        iind_pol = dict(xy=np.arange(len(ind_pol))[ind_pol.values])
 
         # rp1[iind_pol], rp2[iind_pol], rp3[iind_pol] = BBA_calc_pol(rp[iind_pol], asol, sol_vis, sol_nir, sol_sw)
         # rs1[iind_pol], rs2[iind_pol], rs3[iind_pol] = BBA_calc_pol(alb_sph[iind_pol], asol, sol_vis, sol_nir, sol_sw)

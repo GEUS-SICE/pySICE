@@ -345,10 +345,10 @@ def write_output(snow, OutputFolder, filename):
         data_out['albedo_bb_planar_sw'] = snow.rp3.to_pandas()
         data_out['albedo_bb_spherical_sw'] = snow.rs3.to_pandas()
         # for i in np.append(np.arange(11), np.arange(15,21)):
-        # for i in np.arange(21):
-            # data_out['albedo_spectral_spherical_' + str(i + 1).zfill(2)] = snow.alb_sph[i,:,:]
-        # for i in np.append(np.arange(11), np.arange(15,21)):
-            # data_out['rBRR_'+str(i+1).zfill(2)] = snow.rp[i,:,:]
+        for i in np.arange(21):
+            data_out['albedo_spectral_spherical_' + str(i + 1).zfill(2)] = snow.alb_sph.sel(band=i).to_pandas()
+            data_out['albedo_spectral_planar_' + str(i + 1).zfill(2)] = snow.rp.sel(band=i).to_pandas()
+            data_out['rBRR_'+str(i+1).zfill(2)] = snow.refl.sel(band=i).to_pandas()
         data_out.to_csv(OutputFolder + '/out.csv')
         print(OutputFolder + '/out.csv')
     else:
