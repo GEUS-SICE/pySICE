@@ -469,8 +469,7 @@ def snow_albedo_solved(
     # solving iteratively the transcendental equation
     # Update 2022: for all pixels!
     snow["alb_sph"] = OLCI_scene.toa * np.nan
-    ind_solved = snow.r0.notnull()
-    iind_solved = dict(xy=np.arange(len(ind_solved))[ind_solved.values])
+    iind_solved = dict(xy=snow.xy.values[snow.r0.notnull().values])
     snow.alb_sph.loc[iind_solved] = 1
 
     def solver_wrapper(toa, tau, t1t2, r0, u1, u2, albatm, r):
@@ -487,15 +486,15 @@ def snow_albedo_solved(
 
     # loop over all bands
     for i_channel in range(21):
-        snow.alb_sph.sel(band=i_channel)[iind_solved] = solver_wrapper_v(
-            OLCI_scene.toa.sel(band=i_channel)[iind_solved],
-            aerosol.tau.sel(band=i_channel)[iind_solved],
-            atmosphere.t1t2.sel(band=i_channel)[iind_solved],
-            snow.r0[iind_solved],
-            angles.u1[iind_solved],
-            angles.u2[iind_solved],
-            atmosphere.albatm.sel(band=i_channel)[iind_solved],
-            atmosphere.r.sel(band=i_channel)[iind_solved],
+        snow.alb_sph.sel(band=i_channel).loc[iind_solved] = solver_wrapper_v(
+            OLCI_scene.toa.sel(band=i_channel).loc[iind_solved],
+            aerosol.tau.sel(band=i_channel).loc[iind_solved],
+            atmosphere.t1t2.sel(band=i_channel).loc[iind_solved],
+            snow.r0.loc[iind_solved],
+            angles.u1.loc[iind_solved],
+            angles.u2.loc[iind_solved],
+            atmosphere.albatm.sel(band=i_channel).loc[iind_solved],
+            atmosphere.r.sel(band=i_channel).loc[iind_solved],
         )
         # ind_bad = snow.alb_sph.sel(band=i_channel) == -999
         # snow["isnow"] = xr.where(ind_bad, -i_channel, snow.isnow)
@@ -638,7 +637,7 @@ def ozone_retrieval(OLCI_scene, snow, angles):
     tt620 = OLCI_scene.toa.sel(band=6) / snow.refl_direct.sel(band=6)
     # calculation of gaseous vertical optical depth:
     vodka = -np.log(tt620) / angles.inv_cos_za
-    tocos = vodka * 9349.3
+    tocos = vodka.where(vodka > 0) * 9349.3
     difoz = 100 * (tocos - OLCI_scene.ozone / 2.1415e-5) / tocos
     snow["tocos"] = tocos
     snow["difoz"] = np.abs(difoz)
@@ -754,15 +753,15 @@ def compute_BBA(OLCI_scene, snow, angles, compute_polluted=True):
     if compute_polluted:
         # calculation of the BBA for the polluted snow
         ind_pol = (snow.isnow == 2) | (snow.isnow == 3)
-        iind_pol = dict(xy=np.arange(len(ind_pol))[ind_pol.values])
+        iind_pol = dict(xy=snow.xy.values[ind_pol])
 
         # rp1[iind_pol], rp2[iind_pol], rp3[iind_pol] = BBA_calc_pol(rp[iind_pol], asol, sol_vis, sol_nir, sol_sw)
         # rs1[iind_pol], rs2[iind_pol], rs3[iind_pol] = BBA_calc_pol(alb_sph[iind_pol], asol, sol_vis, sol_nir, sol_sw)
-        _, _, snow.rp3[iind_pol] = BBA_calc_pol(
-            snow.rp[iind_pol].values.T, asol, sol_vis, sol_nir, sol_sw
+        _, _, snow.rp3.loc[iind_pol] = BBA_calc_pol(
+            snow.rp.loc[iind_pol].values.T, asol, sol_vis, sol_nir, sol_sw
         )
-        _, _, snow.rs3[iind_pol] = BBA_calc_pol(
-            snow.alb_sph[iind_pol].values.T, asol, sol_vis, sol_nir, sol_sw
+        _, _, snow.rs3.loc[iind_pol] = BBA_calc_pol(
+            snow.alb_sph.loc[iind_pol].values.T, asol, sol_vis, sol_nir, sol_sw
         )
     msk = OLCI_scene.toa.sel(band=0) < thv0
     snow["rp3"] = xr.where(msk, snow["rp3"] * snow.factor, snow["rp3"])
@@ -1191,7 +1190,7 @@ def main():
 
     duration = time.process_time() - start_time
     print("Time elapsed: ", duration)
-    write_output(snow, OutputFolder, OLCI_reader.filepath)
+    write_output(snow, OutputFolder, OLCI_reader.dirname)
 
 
 if __name__ == "__main__":

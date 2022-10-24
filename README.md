@@ -72,20 +72,20 @@ Input files:
 |--------------------------------------|------------------------------------------------------------------------|-------------|
 | grain_diameter.tif                   | Snow grain diameter                                                    | mm          |
 | snow_specific_surface_area.tif       | Snow specific surface area                                             | m^{2}kg^{-1}|
-| albedo_bb_planar_nir.tif             | near infrared broadband planar albedo                                  | 700-2400 nm |
 | albedo_bb_planar_sw.tif              | shortwave broadband planar albedo                                      | 300-2400 nm |
-| albedo_bb_planar_vis.tif             | visible broadband planar albedo                                        | 300-700 nm  |
-| albedo_bb_spherical_nir.tif          | near infrared broadband spherical albedo                               | 700-2400 nm |
 | albedo_bb_spherical_sw.tif           | shortwave broadband spherical albedo                                   | 300-2400 nm |
-| albedo_bb_spherical_vis.tif          | visible broadband spherical albedo                                     | 300-700 nm  |
 | rBRR_01..21.tif                      | bottom of the atmosphere surface reflectance (OLCI bands 1 through 21) |             |
 | albedo_spectral_planar_01..21.tif    | spectral planar albedo (OLCI bands 1 to 11 and 16 to 21)               |             |
 | albedo_spectral_spherical_01..21.tif | spectral spherical albedo (OLCI bands 1 to 11 and 16 to 21)            |             |
 | isnow.tif                            | See next table                                                         |             |
-| conc.tif                             | pollutant concentration (volumetric concentration)                     |             |
-| al.tif                               | effective absorption length(mm)                                        |             |
+| impurity_load.tif                    | pollutant load                                                         |  ppm_weight |
+| pol_type.tif                         | type of pollutant:  1(soot), 2( dust), 3 and 4 (other or mixture)      |             |
+| al.tif                               | effective absorption length                                            |     mm      |
 | r0.tif                               | reflectance of a semi-infinite non-absorbing snow layer                |             |
-| 03_SICE.tif                          | total ozone product (OLCI) corrected for ozone scattering              |             |
+| O3_SICE.tif                          | total ozone product (OLCI) corrected for ozone scattering              |             |
+| factor.tif                           | Snow covered fraction within mixed pixels                              |             |
+| cv1.tif                              | quality check 1 (see ATBD)                                             |             |
+| cv2.tif                              | quality check 1 (see ATBD)                                             |             |
 
 
 

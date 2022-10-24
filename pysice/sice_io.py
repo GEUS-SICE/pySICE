@@ -115,7 +115,7 @@ class sice_io(object):
             try:
                 dat = read_tif(f"r_TOA_{i + 1:02}.tif")
             except:
-                if i in [16, 20]:
+                if i in [0, 3, 16, 20]:
                     raise Exception("Missing the necessary bands")
                 else:
                     print(
@@ -353,7 +353,7 @@ def write_output(snow, OutputFolder, filename):
         print(OutputFolder + '/out.csv')
     else:
         file_name_list = {
-            "BXXX": "O3_SICE",
+            "tocos": "O3_SICE",
             "diameter": "grain_diameter",
             "area": "snow_specific_area",
             "al": "al",
@@ -363,12 +363,13 @@ def write_output(snow, OutputFolder, filename):
             "rp3": "albedo_bb_planar_sw",
             "rs3": "albedo_bb_spherical_sw",
             "factor": "factor",
-            "tocos": "03_SICE",
             "cv1": "cv1",
             "cv2": "cv2",
             "difoz": "difoz",
+            "aload_ppm": 'impurity_load',   # (ppm_weight)
+            "ntype": "pol_type"   # ntype: 1(soot), 2( dust), 3 and 4 (other or mixture)
         }
-    
+
         def da_to_tif(da, file_path):
             da = da.unstack(dim="xy").transpose("y", "x")
             da.rio.to_raster(file_path, dtype="float32", compress="DEFLATE")
@@ -385,21 +386,25 @@ def write_output(snow, OutputFolder, filename):
             "tocos",
             "cv1",
             "cv2",
-            "difoz",
+            'ntype',
+            'aload_ppm',
         ]:
             if var in snow.keys():
                 da_to_tif(
                     snow[var], os.path.join(OutputFolder, file_name_list[var] + ".tif")
                 )
-    
-        # da_to_tif(snow.alb_sph.sel(band=0), OutputFolder+'/alb_sph_01_solved.tif')
-        # da_to_tif(snow.rp.sel(band=0), OutputFolder+'/alb_pl_01_solved.tif')
-    
-        # if 'alb_sph_direct' in list(snow.keys()):
-        #     da_to_tif(snow.alb_sph_direct.sel(band=0), OutputFolder+'/alb_sph_01.tif')
-        # if 'rp_direct' in list(snow.keys()):
-        #     da_to_tif(snow.rp_direct.sel(band=0), OutputFolder+'/alb_pl_01.tif')
 
+        for i in np.append(np.arange(11), np.arange(15, 21)):
+            if snow.alb_sph.sel(band=i).notnull().any():
+                da_to_tif(snow.alb_sph.sel(band=i),
+                          OutputFolder+'/albedo_spectral_spherical_' + str(i + 1).zfill(2) + ".tif")
+            if snow.rp.sel(band=i).notnull().any():
+                da_to_tif(snow.rp.sel(band=i), 
+                      OutputFolder+'/albedo_spectral_planar_' + str(i + 1).zfill(2) + ".tif")
+            if snow.refl.sel(band=i).notnull().any():
+                da_to_tif(snow.refl.sel(band=i), 
+                      OutputFolder+'/rBRR_' + str(i + 1).zfill(2) + ".tif")
+    
 
 def get_parser():
     """
