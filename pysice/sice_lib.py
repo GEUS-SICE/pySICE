@@ -109,6 +109,9 @@ def process(OLCI_scene, compute_polluted=True, **kwargs):
     angles = view_geometry(OLCI_scene)
     OLCI_scene = ozone_correction(OLCI_scene)
     OLCI_scene, snow = prepare_processing(OLCI_scene)
+    if 'aot' not in OLCI_scene.keys():
+        OLCI_scene['aot'] = OLCI_scene.sza*0 + 0.07
+        OLCI_scene['aer_ang'] = OLCI_scene.sza*0 + 1.3
     aerosol = aerosol_properties(OLCI_scene.elevation, angles.cos_sa, OLCI_scene.aot, OLCI_scene.aer_ang)
     OLCI_scene, angles, snow = snow_properties(OLCI_scene, angles, snow)
     atmosphere = prepare_coef(aerosol, angles)
