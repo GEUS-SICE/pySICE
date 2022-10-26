@@ -107,13 +107,11 @@ cabsoz = xr.DataArray(
 # aerosol properties(aot=aot500nm,ANNA=Angström exponent)
 aot = 0.07
 anna = 1.3
-# MOLEC=0,1 - two versions of molecular optical thickness
-molec = 0
-jend = 100  # number of pixels to be printed (with spectral data)
+
 # patchy snow threshold for the channel R(400nm)
 thv0 = 0.75
 # threshold for the measured and simulated spectra differences
-thv1 = 10.0
+thv1 = 5.0
 # threshold for the grain diameter
 thv2 = 0.07
 # threshold for the total ozone column retrieved
