@@ -466,70 +466,64 @@ def prepare_coef_numpy(tau, g, p, cos_sza, cos_vza, inv_cos_za, gaer, taumol, ta
 def snow_albedo_solved(
     OLCI_scene, angles, aerosol, atmosphere, snow, compute_polluted=True
 ):
+    snow["alb_sph"] = OLCI_scene.toa * np.nan
+    snow["rp"] = OLCI_scene.toa * np.nan
+    snow["refl"] = OLCI_scene.toa * np.nan
+
     # solving iteratively the transcendental equation
     # Update 2022: for all pixels!
-    snow["alb_sph"] = OLCI_scene.toa * np.nan
-    iind_solved = dict(xy=snow.xy.values[snow.r0.notnull().values])
-    snow.alb_sph.loc[iind_solved] = 1
 
-    def solver_wrapper(toa, tau, t1t2, r0, u1, u2, albatm, r):
-        # it is assumed that albedo is in the range 0.1-1.0
-        return zbrent(
-            0.1,
-            1,
-            args=(t1t2, r0, u1, u2, albatm, r, toa),
-            max_iter=100,
-            tolerance=1e-10,
+    if snow.r0.notnull().any():
+        iind_solved = dict(xy=snow.xy.values[snow.r0.notnull().values])
+        snow.alb_sph.loc[iind_solved] = 1
+    
+        def solver_wrapper(toa, tau, t1t2, r0, u1, u2, albatm, r):
+            # it is assumed that albedo is in the range 0.1-1.0
+            return zbrent(
+                0.1,
+                1,
+                args=(t1t2, r0, u1, u2, albatm, r, toa),
+                max_iter=100,
+                tolerance=1e-10,
+            )
+    
+        solver_wrapper_v = np.vectorize(solver_wrapper)
+    
+        # loop over all bands
+        for i_channel in range(21):
+            snow.alb_sph.sel(band=i_channel).loc[iind_solved] = solver_wrapper_v(
+                OLCI_scene.toa.sel(band=i_channel).loc[iind_solved],
+                aerosol.tau.sel(band=i_channel).loc[iind_solved],
+                atmosphere.t1t2.sel(band=i_channel).loc[iind_solved],
+                snow.r0.loc[iind_solved],
+                angles.u1.loc[iind_solved],
+                angles.u2.loc[iind_solved],
+                atmosphere.albatm.sel(band=i_channel).loc[iind_solved],
+                atmosphere.r.sel(band=i_channel).loc[iind_solved],
+            )
+    
+            ind_bad = snow.alb_sph.sel(band=i_channel) < 0
+            snow.alb_sph.loc[dict(band=i_channel)] = xr.where(
+                ind_bad, -i_channel, snow.alb_sph.sel(band=i_channel)
+            )
+    
+        # correcting the retrived spherical albedo for fractional snow cover
+        snow["rp"] = snow.factor * (snow.alb_sph ** angles.u1)
+        snow["refl"] = (
+            snow.factor * snow.r0 * snow.alb_sph ** (angles.u1 * angles.u2 / snow.r0)
         )
-
-    solver_wrapper_v = np.vectorize(solver_wrapper)
-
-    # loop over all bands
-    for i_channel in range(21):
-        snow.alb_sph.sel(band=i_channel).loc[iind_solved] = solver_wrapper_v(
-            OLCI_scene.toa.sel(band=i_channel).loc[iind_solved],
-            aerosol.tau.sel(band=i_channel).loc[iind_solved],
-            atmosphere.t1t2.sel(band=i_channel).loc[iind_solved],
-            snow.r0.loc[iind_solved],
-            angles.u1.loc[iind_solved],
-            angles.u2.loc[iind_solved],
-            atmosphere.albatm.sel(band=i_channel).loc[iind_solved],
-            atmosphere.r.sel(band=i_channel).loc[iind_solved],
-        )
-        # ind_bad = snow.alb_sph.sel(band=i_channel) == -999
-        # snow["isnow"] = xr.where(ind_bad, -i_channel, snow.isnow)
-
-        ind_bad = snow.alb_sph.sel(band=i_channel) < 0
-        snow.alb_sph.loc[dict(band=i_channel)] = xr.where(
-            ind_bad, 1, snow.alb_sph.sel(band=i_channel)
-        )
-    # some filtering
-    # snow["alb_sph"] = snow.alb_sph.where(snow.isnow >= 0)
-    # ind_neg_alb = (
-    #     (snow.alb_sph.sel(band=0) < 0)
-    #     | (snow.alb_sph.sel(band=1) < 0)
-    #     | (snow.alb_sph.sel(band=2) < 0)
-    # )
-    # snow["alb_sph"] = xr.where(ind_neg_alb, np.nan, snow["alb_sph"])
-    # snow["isnow"] = xr.where(ind_neg_alb, 105, snow.isnow)
-
-    # correcting the retrived spherical albedo for fractional snow cover
-    snow["rp"] = snow.factor * (snow.alb_sph ** angles.u1)
-    snow["refl"] = (
-        snow.factor * snow.r0 * snow.alb_sph ** (angles.u1 * angles.u2 / snow.r0)
-    )
-    snow["alb_sph"] = snow["factor"] * snow["alb_sph"]
-
-    if compute_polluted:
-        ind_no_nan = snow["isnow"].notnull()
-        snow["isnow"] = xr.where(snow.alb_sph.sel(band=0) > 0.98, 1, snow.isnow)
-        snow["isnow"] = xr.where(
-            (snow.alb_sph.sel(band=0) <= 0.98) & (snow.factor > 0.99), 2, snow.isnow
-        )
-        snow["isnow"] = xr.where(
-            (snow.alb_sph.sel(band=0) <= 0.98) & (snow.factor <= 0.99), 3, snow.isnow
-        )
-        snow["isnow"] = snow["isnow"].where(ind_no_nan)
+        snow["alb_sph"] = snow["factor"] * snow["alb_sph"]
+    
+        if compute_polluted:
+            ind_no_nan = snow["isnow"].notnull()
+            snow["isnow"] = xr.where(snow.alb_sph.sel(band=0) > 0.98, 1, snow.isnow)
+            snow["isnow"] = xr.where(
+                (snow.alb_sph.sel(band=0) <= 0.98) & (snow.factor > 0.99), 2, snow.isnow
+            )
+            snow["isnow"] = xr.where(
+                (snow.alb_sph.sel(band=0) <= 0.98) & (snow.factor <= 0.99), 3, snow.isnow
+            )
+            snow["isnow"] = snow["isnow"].where(ind_no_nan)
     return OLCI_scene, snow
 
 
