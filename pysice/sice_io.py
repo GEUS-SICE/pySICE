@@ -495,8 +495,12 @@ def get_output_folder(args):
     """
     if args.output_folder:
         out = args.output_folder
+    else:
+        out = ""
+        
     if args.fl_out:
         out = args.fl_out
+        
     if os.path.exists(out):
         return out
     else:
