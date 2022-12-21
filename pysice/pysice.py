@@ -504,7 +504,7 @@ def snow_albedo_solved(
     
             ind_bad = snow.alb_sph.sel(band=i_channel) < 0
             snow.alb_sph.loc[dict(band=i_channel)] = xr.where(
-                ind_bad, -i_channel, snow.alb_sph.sel(band=i_channel)
+                ind_bad, 1, snow.alb_sph.sel(band=i_channel)
             )
     
         # correcting the retrived spherical albedo for fractional snow cover
